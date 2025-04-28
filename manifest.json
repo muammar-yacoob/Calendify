@@ -22,13 +22,13 @@
     }
   },
   "content_scripts": [{
-    "matches": ["http://*/*", "https://*/*", "file://*/*"],
+    "matches": ["https://*/*", "http://*/*"],
     "js": ["src/js/content.js"],
     "run_at": "document_idle"
   }],
   "web_accessible_resources": [{
     "resources": ["manifest.json", "src/js/utils/*", "src/html/popup.html"],
-    "matches": ["<all_urls>"]
+    "matches": ["https://*/*", "http://*/*"]
   }],
   "icons": {
     "48": "res/icons/icon48.png",

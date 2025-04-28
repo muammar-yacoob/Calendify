@@ -822,5 +822,4 @@ function findDescription() {
 setTimeout(() => {
   const eventDetails = extractEventData();
   console.log('Initial page data extraction:', eventDetails);
-  chrome.storage.local.set({ lastExtractedDetails: eventDetails });
 }, 1000);

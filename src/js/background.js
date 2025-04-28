@@ -190,12 +190,46 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Open Google Calendar in a new tab
     chrome.tabs.create({ url: gcalUrl }, (tab) => {
       console.log('Opened Google Calendar with event details');
+      // Show a system notification
+      showSystemNotification(
+        "Event Added to Calendar", 
+        `"${eventDetails.title}" has been added to your Google Calendar.`,
+        "success"
+      );
       sendResponse({ success: true });
     });
     
     return true; // Keep the messaging channel open for async response
   }
 });
+
+// Show a system notification using Chrome's Notifications API
+function showSystemNotification(title, message, type = 'basic') {
+  const iconPath = type === 'success' 
+    ? chrome.runtime.getURL("res/icons/icon128.png")
+    : chrome.runtime.getURL("res/icons/icon128.png");
+  
+  const notificationOptions = {
+    type: 'basic',
+    title: title,
+    message: message,
+    iconUrl: iconPath,
+    priority: 2
+  };
+  
+  // Generate a unique ID based on current time
+  const notificationId = 'calendify-' + Date.now();
+  
+  // Create the notification
+  chrome.notifications.create(notificationId, notificationOptions, (id) => {
+    console.log('Notification shown with ID:', id);
+    
+    // Auto-clear after 5 seconds
+    setTimeout(() => {
+      chrome.notifications.clear(id);
+    }, 5000);
+  });
+}
 
 // Create Google Calendar URL with event details
 function createGoogleCalendarUrl(eventDetails) {
