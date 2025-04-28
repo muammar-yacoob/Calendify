@@ -8,7 +8,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     title: urlParams.get('title') || '',
     date: urlParams.get('date') || '',
     time: urlParams.get('time') || '',
-    location: urlParams.get('location') || ''
+    location: urlParams.get('location') || '',
+    meetingLink: urlParams.get('meetingLink') || '',
+    description: urlParams.get('description') || ''
   };
   
   console.log('URL parameters:', prefilled);
@@ -22,11 +24,34 @@ document.addEventListener('DOMContentLoaded', async () => {
   const addButtonEl = document.getElementById('addButton');
   
   // Set form fields
-  eventDescriptionEl.value = prefilled.text;
   eventTitleEl.value = prefilled.title;
   eventDateEl.value = prefilled.date;
   eventTimeEl.value = prefilled.time;
-  eventLocationEl.value = prefilled.location;
+  
+  // Handle location and meeting link
+  if (prefilled.location) {
+    eventLocationEl.value = prefilled.location;
+  } else if (prefilled.meetingLink) {
+    // If we have a meeting link but no location, mark as online event
+    eventLocationEl.value = `Online Event | ${prefilled.meetingLink}`;
+  }
+  
+  // Handle description and include meeting link if available
+  let description = prefilled.description || prefilled.text || '';
+  
+  // If we have a meeting link and it's not already in the description
+  if (prefilled.meetingLink && !description.includes(prefilled.meetingLink)) {
+    console.log('Adding meeting link to description:', prefilled.meetingLink);
+    if (description) description += '\n\n';
+    description += `Meeting Link: ${prefilled.meetingLink}`;
+  }
+  
+  eventDescriptionEl.value = description;
+  
+  // Store meeting link in a variable for later use instead of creating a DOM element
+  // This avoids the "Cannot read properties of null" error
+  const meetingLinkValue = prefilled.meetingLink || '';
+  console.log('Stored meeting link value:', meetingLinkValue);
   
   // Try to extract details from text if needed fields are missing
   if (prefilled.text && (!prefilled.title || !prefilled.date || !prefilled.time || !prefilled.location)) {
@@ -43,8 +68,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!prefilled.time && extractedDetails.time) {
       eventTimeEl.value = extractedDetails.time;
     }
-    if (!prefilled.location && extractedDetails.location) {
+    
+    // Handle location intelligently
+    if (!eventLocationEl.value && extractedDetails.location) {
       eventLocationEl.value = extractedDetails.location;
+    }
+    
+    // Check if text contains online meeting indicators
+    if (!eventLocationEl.value && isLikelyOnlineEvent(prefilled.text)) {
+      eventLocationEl.value = "Online Event";
     }
   }
   
@@ -72,6 +104,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             const year = new Date().getFullYear();
             eventDateEl.value = `${year}-${month}-${day}`;
           }
+        }
+        
+        // Check if tab title suggests online event
+        if (!eventLocationEl.value && isLikelyOnlineEvent(tabTitle)) {
+          eventLocationEl.value = "Online Event";
         }
       }
     });
@@ -123,13 +160,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     
+    // Use the stored meeting link value from earlier in the script
     const eventDetails = {
       title: eventTitleEl.value,
       date: eventDateEl.value,
       time: eventTimeEl.value,
       location: eventLocationEl.value,
-      description: eventDescriptionEl.value
+      description: eventDescriptionEl.value,
+      meetingLink: meetingLinkValue // Use the stored variable
     };
+
+    console.log('Sending event details to calendar:', eventDetails);
 
     // Send event details to background script
     chrome.runtime.sendMessage({
@@ -146,41 +187,70 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   
   // Add support section with rating and various support links
-  // Import the utility only when it's needed
-  console.log('Attempting to import support links module...');
-  import('./utils/supportLinks.js').then(module => {
-    console.log('Support links module loaded successfully');
-    // Get the manifest to get the extension name
-    fetch(chrome.runtime.getURL('manifest.json'))
-      .then(response => response.json())
-      .then(manifest => {
-        const extensionName = manifest.name || 'Calendify';
-        console.log('Extension name from manifest:', extensionName);
-        
-        // You can customize which support options to show by providing an array
-        // Options are: 'rate', 'github', 'website', 'donate'
-        // By default, all options will be shown
-        const supportOptions = ['rate', 'github', 'website', 'donate'];
-        
-        // Show support section if today is eligible (days divisible by 3)
-        module.showSupportSectionIfEligible(extensionName, supportOptions, () => {
-          // Callback to resize window after adding support section
-          chrome.windows.getCurrent((window) => {
-            if (window) {
-              adjustWindowSize(window.id);
-            }
-          });
-        });
-      })
-      .catch(error => {
-        console.error('Error loading manifest:', error);
-      });
-  }).catch(error => {
-    console.error('Error loading support utilities:', error.message);
-    // Show the exact URL that failed to load
-    console.error('Module path:', chrome.runtime.getURL('src/js/utils/supportLinks.js'));
-  });
+  loadSupportLinks();
 });
+
+// Load support links separately to handle errors better
+async function loadSupportLinks() {
+  console.log('Loading support links...');
+  
+  try {
+    // Try loading the module from different possible paths
+    let supportLinksModule;
+    
+    try {
+      supportLinksModule = await import('./utils/supportLinks.js');
+    } catch (e) {
+      console.warn('First import path failed, trying alternate path...', e);
+      try {
+        supportLinksModule = await import('../js/utils/supportLinks.js');
+      } catch (e2) {
+        console.warn('Second import path failed, trying chrome.runtime.getURL...', e2);
+        const modulePath = chrome.runtime.getURL('src/js/utils/supportLinks.js');
+        supportLinksModule = await import(modulePath);
+      }
+    }
+    
+    if (!supportLinksModule) {
+      throw new Error('Could not load support links module from any path');
+    }
+    
+    console.log('Support links module loaded successfully');
+    
+    // Get the manifest to get the extension name
+    const manifestURL = chrome.runtime.getURL('manifest.json');
+    console.log('Fetching manifest from:', manifestURL);
+    
+    const response = await fetch(manifestURL);
+    const manifest = await response.json();
+    
+    const extensionName = manifest.name || 'Calendify';
+    console.log('Extension name from manifest:', extensionName);
+    
+    // You can customize which support options to show by providing an array
+    const supportOptions = ['rate', 'github', 'website', 'donate'];
+    
+    // Show support section if today is eligible
+    supportLinksModule.showSupportSectionIfEligible(extensionName, supportOptions, () => {
+      // Callback to resize window after adding support section
+      chrome.windows.getCurrent((window) => {
+        if (window) {
+          adjustWindowSize(window.id);
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Error loading support utilities:', error);
+    // Create a simple support section as fallback
+    const supportSection = document.createElement('div');
+    supportSection.style.marginTop = '20px';
+    supportSection.style.textAlign = 'center';
+    supportSection.style.borderTop = '1px solid #5f6368';
+    supportSection.style.paddingTop = '10px';
+    supportSection.textContent = 'Thanks for using Calendify! ⭐';
+    document.body.appendChild(supportSection);
+  }
+}
 
 // Adjust window size to fit content
 function adjustWindowSize(windowId) {
@@ -326,4 +396,33 @@ function showNotification(message, type = 'success') {
   notification.style.backgroundColor = type === 'error' ? '#f28b82' : '#8ab4f8';
   notification.classList.add('show');
   setTimeout(() => notification.classList.remove('show'), 3000);
+}
+
+// Check if text suggests this is an online event
+function isLikelyOnlineEvent(text) {
+  if (!text) return false;
+  
+  const lowerText = text.toLowerCase();
+  const onlineKeywords = [
+    'online event', 'virtual event', 'webinar', 
+    'zoom', 'teams', 'google meet', 'webex',
+    'join online', 'virtual', 'web conference',
+    'online session', 'online workshop'
+  ];
+  
+  for (const keyword of onlineKeywords) {
+    if (lowerText.includes(keyword)) {
+      console.log('Text suggests online event:', keyword);
+      return true;
+    }
+  }
+  
+  // Check for meeting links in the text
+  const meetingLinkRegex = /(?:zoom\.us|teams\.microsoft\.com|meet\.google\.com|webex\.com)/i;
+  if (meetingLinkRegex.test(lowerText)) {
+    console.log('Text contains meeting link');
+    return true;
+  }
+  
+  return false;
 }

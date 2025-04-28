@@ -7,7 +7,7 @@ console.log('Background script loaded');
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: "addToCalendar",
-    title: "Add to Calendar",
+    title: "Calendify",
     contexts: ["selection", "page"]
   });
 });
@@ -198,6 +198,16 @@ function openPopup(eventDetails) {
       `&date=${encodeURIComponent(eventDetails.date || "")}` + 
       `&time=${encodeURIComponent(eventDetails.time || "")}` + 
       `&location=${encodeURIComponent(eventDetails.location || "")}`;
+      
+    // Add meeting link if available
+    if (eventDetails.meetingLink) {
+      popupURL += `&meetingLink=${encodeURIComponent(eventDetails.meetingLink)}`;
+    }
+    
+    // Add description if available
+    if (eventDetails.description) {
+      popupURL += `&description=${encodeURIComponent(eventDetails.description)}`;
+    }
   }
   
   console.log("Opening popup with URL:", popupURL);
@@ -296,7 +306,20 @@ function createGoogleCalendarUrl(eventDetails) {
   
   // Format location and description
   const location = encodeURIComponent(eventDetails.location || '');
-  const details = encodeURIComponent(eventDetails.text || '');
+  
+  // Prepare description - include both the text and meeting link if available
+  let description = eventDetails.description || eventDetails.text || '';
+  
+  // If we have a meetingLink and it's not already in the description
+  if (eventDetails.meetingLink && !description.includes(eventDetails.meetingLink)) {
+    if (description) description += '\n\n';
+    description += `Meeting Link: ${eventDetails.meetingLink}`;
+  }
+  
+  console.log('Final description for Google Calendar:', description);
+  
+  // Encode the final description
+  const details = encodeURIComponent(description);
   
   // Construct URL
   const params = [
