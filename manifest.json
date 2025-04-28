@@ -21,14 +21,9 @@
       "128": "res/icons/icon128.png"
     }
   },
-  "content_scripts": [{
-    "matches": ["https://*/*", "http://*/*"],
-    "js": ["src/js/content.js"],
-    "run_at": "document_idle"
-  }],
   "web_accessible_resources": [{
     "resources": ["manifest.json", "src/js/utils/*", "src/html/popup.html"],
-    "matches": ["https://*/*", "http://*/*"]
+    "matches": ["<all_urls>"]
   }],
   "icons": {
     "48": "res/icons/icon48.png",
