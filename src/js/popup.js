@@ -141,16 +141,22 @@ async function loadCompactSupportLinks() {
     
     const { category } = randomCategoryInfo;
     
+    // Create flexible container to better handle wrapping
+    const flexContainer = document.createElement('div');
+    flexContainer.style.display = 'flex';
+    flexContainer.style.flexWrap = 'wrap';
+    flexContainer.style.alignItems = 'center';
+    flexContainer.style.width = '100%';
+    flexContainer.style.gap = '6px';
+    flexContainer.style.padding = '2px 0';  // Add vertical padding within container
+    
     // Create text element - compact
     const textEl = document.createElement('div');
     textEl.classList.add('support-text');
     
-    // Get a shorter message
+    // Get a message but ensure it's not too long
     let message = supportLinksModule.getRandomMessage(category.messages);
-    // Truncate message if too long
-    if (message.length > 70) {
-      message = message.substring(0, 67) + '...';
-    }
+    // No need to truncate as we're using wrapping now
     textEl.textContent = message;
     
     // Create button element - compact
@@ -160,9 +166,10 @@ async function loadCompactSupportLinks() {
     buttonEl.target = '_blank';
     buttonEl.textContent = `${category.title} ${category.emoji}`;
     
-    // Add elements to the support container
-    supportContainer.appendChild(textEl);
-    supportContainer.appendChild(buttonEl);
+    // Add elements to the support container in a way that allows wrapping
+    flexContainer.appendChild(textEl);
+    flexContainer.appendChild(buttonEl);
+    supportContainer.appendChild(flexContainer);
     
     // Adjust window size after adding support section
     setTimeout(() => adjustWindowSize(), 50);
@@ -185,7 +192,7 @@ function adjustWindowSize() {
   if (contentHeight > 0) {
     // Ensure there's enough room for all content including support section
     // Add extra padding to prevent clipping
-    const targetHeight = Math.min(Math.max(contentHeight + 40, 340), 480);
+    const targetHeight = Math.min(Math.max(contentHeight + 45, 340), 490);
     chrome.windows.getCurrent((window) => {
       if (window) {
         chrome.windows.update(window.id, { height: targetHeight });
