@@ -183,8 +183,9 @@ async function loadCompactSupportLinks() {
 function adjustWindowSize() {
   const contentHeight = document.body.scrollHeight;
   if (contentHeight > 0) {
-    // Use more compact sizing with less padding
-    const targetHeight = Math.min(Math.max(contentHeight + 20, 320), 480);
+    // Ensure there's enough room for all content including support section
+    // Add extra padding to prevent clipping
+    const targetHeight = Math.min(Math.max(contentHeight + 40, 340), 480);
     chrome.windows.getCurrent((window) => {
       if (window) {
         chrome.windows.update(window.id, { height: targetHeight });

@@ -350,9 +350,56 @@ function findLocation() {
     '.address-text',
     '.location-address',
     '[class*="location-info"]',
-    '[class*="address"]'
+    '[class*="address"]',
+    '[itemprop="address"]',
+    '[itemprop="location"]'
   ];
   
+  // Function to clean up address text
+  function cleanAddressText(text) {
+    return text.replace(/Show map.*$/i, '')
+              .replace(/\s+/g, ' ')
+              .replace(/Get directions.*$/i, '')
+              .trim();
+  }
+  
+  // First look for structured address data which is most reliable
+  const addressElements = document.querySelectorAll('[itemtype*="PostalAddress"], [itemprop="address"], [itemprop="location"]');
+  for (const el of addressElements) {
+    if (el.offsetParent === null) continue; // Skip hidden elements
+    
+    // Try to find specific address parts from structured data
+    const streetAddress = el.querySelector('[itemprop="streetAddress"]');
+    const locality = el.querySelector('[itemprop="addressLocality"]');
+    const region = el.querySelector('[itemprop="addressRegion"]');
+    const postalCode = el.querySelector('[itemprop="postalCode"]');
+    const country = el.querySelector('[itemprop="addressCountry"]');
+    
+    // If we found structured parts, build a proper address
+    if (streetAddress || locality || region || postalCode) {
+      let address = [];
+      if (streetAddress) address.push(streetAddress.textContent.trim());
+      if (locality) address.push(locality.textContent.trim());
+      if (region) address.push(region.textContent.trim());
+      if (postalCode) address.push(postalCode.textContent.trim());
+      if (country) address.push(country.textContent.trim());
+      
+      const fullAddress = address.join(', ');
+      if (fullAddress) {
+        console.log('Found structured address data:', fullAddress);
+        return fullAddress;
+      }
+    }
+    
+    // If no structured parts but we have address text, use it
+    const addressText = cleanAddressText(el.textContent);
+    if (addressText && addressText.length > 5) {
+      console.log('Found address in structured data element:', addressText);
+      return addressText;
+    }
+  }
+  
+  // Check for specific location elements with dedicated class names
   for (const selector of specificLocationSelectors) {
     const elements = document.querySelectorAll(selector);
     for (const el of elements) {
@@ -361,60 +408,86 @@ function findLocation() {
       const text = el.textContent.trim();
       // Filter out very short texts and those with controls/buttons
       if (text && text.length > 3 && !text.includes('Show map')) {
-        // Try to clean up the text - remove any excessive whitespace and button text
-        let cleanText = text.replace(/Show map.*$/i, '')
-                            .replace(/\s+/g, ' ')
-                            .trim();
-                            
+        // Try to clean up the text
+        let cleanText = cleanAddressText(text);
+        
+        // If we have a multi-line address, preserve newlines by replacing with commas
+        if (el.innerHTML.includes('<br')) {
+          cleanText = el.innerHTML.replace(/<br\s*\/?>/gi, ', ')
+                                 .replace(/<[^>]*>/g, '')  // Remove other HTML tags
+                                 .replace(/\s+/g, ' ')      // Replace multiple spaces
+                                 .replace(/,\s*,/g, ',')    // Remove empty commas
+                                 .trim();
+        }
+        
         console.log('Found location in specific selector:', selector, cleanText);
         return cleanText;
       }
     }
   }
   
-  // Priority 1: Look for address structured data
-  const addressEl = document.querySelector('[itemtype*="PostalAddress"], [itemprop="address"], [itemprop="location"]');
-  if (addressEl) {
-    const addressText = addressEl.textContent.trim();
-    if (addressText) {
-      console.log('Found address in structured data:', addressText);
-      return addressText;
-    }
-  }
+  // Look for elements containing postal codes - strong indicator of an address
+  const postalCodePatterns = [
+    /\b[A-Z]{1,2}\d{1,2}[A-Z]?\s*\d[A-Z]{2}\b/i, // UK Postal Code
+    /\b\d{5}(-\d{4})?\b/,                        // US Zip Code
+    /\b[A-Z]\d[A-Z]\s*\d[A-Z]\d\b/i,             // Canadian Postal Code
+    /\b\d{4}\s*[A-Z]{2}\b/i,                     // Dutch Postal Code
+    /\b\d{2}-\d{3}\b/                            // Polish Postal Code
+  ];
   
-  // Priority 2: Look for common location classes
-  const locationEl = document.querySelector('.location, .venue, .place, .event-location');
-  if (locationEl && locationEl.textContent.trim()) {
-    const location = locationEl.textContent.trim();
-    console.log('Found location in common element:', location);
-    return location;
-  }
+  const paragraphs = Array.from(document.querySelectorAll('p, div, span')).filter(el => {
+    return el.offsetParent !== null && el.textContent.trim().length > 5;
+  });
   
-  // Priority 3: Look for online meeting links
-  const meetingLink = findMeetingLink();
-  if (meetingLink) {
-    console.log('Found online meeting link:', meetingLink);
-    return meetingLink;
-  }
-  
-  // Priority 4: Look for location patterns in text
-  const paragraphs = Array.from(document.querySelectorAll('p, span, div')).filter(el => {
-    return el.offsetParent !== null;
-  }).map(el => el.textContent.trim());
-  
-  for (const text of paragraphs) {
-    // Look for "Location: X" or "Venue: X" pattern
-    const locationMatch = text.match(/(?:location|venue|place|at|where)[\s:]+([^\n,\.]+)/i);
-    if (locationMatch) {
-      console.log('Found location pattern in text:', locationMatch[1].trim());
-      return locationMatch[1].trim();
-    }
+  // Try each paragraph to see if it contains a postal code
+  for (const el of paragraphs) {
+    const text = el.textContent.trim();
     
-    // Look for postal code patterns which often indicate an address
-    const postalCodeMatch = text.match(/\b[A-Z]{1,2}\d{1,2}[A-Z]?\s*\d[A-Z]{2}\b/i); // UK Postal Code
-    if (postalCodeMatch && text.length < 200) {
-      console.log('Found text with postal code, likely an address:', text);
-      return text;
+    // Check against postal code patterns
+    for (const pattern of postalCodePatterns) {
+      if (pattern.test(text)) {
+        // If a paragraph contains a postal code, it's likely an address
+        // But we want to ensure it's not too long (like a paragraph with an address)
+        if (text.length < 200) {
+          console.log('Found text with postal code, likely an address:', text);
+          
+          // Check if there's a parent element that might contain the full address
+          let parent = el.parentElement;
+          if (parent && parent.textContent.length < 300) {
+            // If parent is not much larger than the element, use parent text
+            // as it might contain the complete address
+            const parentText = cleanAddressText(parent.textContent);
+            if (parentText.length > text.length * 1.2) {
+              console.log('Using parent element for more complete address:', parentText);
+              return parentText;
+            }
+          }
+          
+          return cleanAddressText(text);
+        }
+      }
+    }
+  }
+  
+  // Look for elements with common location class names or text indicators
+  const locationElements = document.querySelectorAll('.location, .venue, .place, .event-location');
+  for (const el of locationElements) {
+    if (el.offsetParent === null) continue;
+    const location = cleanAddressText(el.textContent);
+    if (location && location.length > 3) {
+      console.log('Found location in common element:', location);
+      return location;
+    }
+  }
+  
+  // Look for "Location: X" pattern in text
+  for (const el of paragraphs) {
+    const text = el.textContent;
+    const locationMatch = text.match(/(?:location|venue|place|at|where)[\s:]+([^\n,\.]+(?:[^\n]*(?:street|road|ave|lane|blvd|drive|dr|st|rd|avenue|plaza|square|court|ct|way|place|pl|boulevard|terrace|ter))?)/i);
+    if (locationMatch) {
+      const location = cleanAddressText(locationMatch[1]);
+      console.log('Found location pattern in text:', location);
+      return location;
     }
   }
   
