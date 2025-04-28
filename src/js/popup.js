@@ -127,15 +127,12 @@ async function loadCompactSupportLinks() {
     const manifest = await (await fetch(chrome.runtime.getURL('manifest.json'))).json();
     const extensionName = manifest.name || 'Calendify';
     
-    // Create a more compact support section
-    const supportSection = document.createElement('div');
-    supportSection.className = 'support-section';
-    supportSection.style.marginTop = '4px';
-    supportSection.style.paddingTop = '4px';
-    supportSection.style.borderTop = '1px solid #5f6368';
-    supportSection.style.display = 'flex';
-    supportSection.style.alignItems = 'center';
-    supportSection.style.justifyContent = 'space-between';
+    // Get the support container from the HTML
+    const supportContainer = document.getElementById('supportContainer');
+    if (!supportContainer) {
+      console.error('Support container not found');
+      return;
+    }
     
     // Get a random category
     const options = ['rate', 'github', 'website', 'donate'];
@@ -144,44 +141,41 @@ async function loadCompactSupportLinks() {
     
     const { category } = randomCategoryInfo;
     
-    // Create text element - more compact
+    // Create text element - compact
     const textEl = document.createElement('div');
-    textEl.style.fontSize = '10px';
-    textEl.style.color = '#e8eaed';
-    textEl.style.flex = '1';
-    textEl.style.marginRight = '8px';
+    textEl.classList.add('support-text');
     
     // Get a shorter message
     let message = supportLinksModule.getRandomMessage(category.messages);
     // Truncate message if too long
-    if (message.length > 80) {
-      message = message.substring(0, 77) + '...';
+    if (message.length > 70) {
+      message = message.substring(0, 67) + '...';
     }
     textEl.textContent = message;
     
-    // Create button element - even more compact
+    // Create button element - compact
     const buttonEl = document.createElement('a');
+    buttonEl.classList.add('support-button');
     buttonEl.href = category.getUrl();
     buttonEl.target = '_blank';
-    buttonEl.style.backgroundColor = '#8ab4f8';
-    buttonEl.style.color = '#202124';
-    buttonEl.style.border = 'none';
-    buttonEl.style.borderRadius = '4px';
-    buttonEl.style.padding = '3px 8px';
-    buttonEl.style.fontSize = '10px';
-    buttonEl.style.fontWeight = 'bold';
-    buttonEl.style.textDecoration = 'none';
-    buttonEl.style.whiteSpace = 'nowrap';
     buttonEl.textContent = `${category.title} ${category.emoji}`;
     
-    supportSection.appendChild(textEl);
-    supportSection.appendChild(buttonEl);
-    document.body.appendChild(supportSection);
+    // Add elements to the support container
+    supportContainer.appendChild(textEl);
+    supportContainer.appendChild(buttonEl);
     
     // Adjust window size after adding support section
     setTimeout(() => adjustWindowSize(), 50);
   } catch (error) {
     console.error('Error loading support utilities:', error);
+    
+    // Add a simple fallback if there's an error
+    const supportContainer = document.getElementById('supportContainer');
+    if (supportContainer) {
+      supportContainer.textContent = 'Thanks for using Calendify! ⭐';
+      supportContainer.style.fontSize = '10px';
+      supportContainer.style.textAlign = 'center';
+    }
   }
 }
 
