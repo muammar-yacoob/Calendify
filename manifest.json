@@ -9,7 +9,8 @@
     "storage",
     "contextMenus",
     "activeTab",
-    "notifications"
+    "notifications",
+    "tabs"
   ],
   "optional_permissions": [
     "identity"
@@ -34,6 +35,10 @@
   "content_scripts": [{
     "matches": ["*://*/*"],
     "js": ["src/js/content.js"]
+  }],
+  "web_accessible_resources": [{
+    "resources": ["manifest.json", "src/js/utils/*"],
+    "matches": ["<all_urls>"]
   }],
   "icons": {
     "48": "res/icons/icon48.png",

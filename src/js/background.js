@@ -6,52 +6,106 @@ console.log('Background script loaded');
 // Setup context menu on installation
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
-    id: "addToCalendar",
+    id: "add-to-calendar",
     title: "Add to Calendar",
-    contexts: ["selection", "page"],
-    documentUrlPatterns: ["*://*/*"]
+    contexts: ["selection", "page"]
   });
 });
 
 // Handle context menu clicks
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === "addToCalendar") {
-    // Try to get event details from the content script
-    chrome.tabs.sendMessage(tab.id, { action: "getSelectedText" }, (response) => {
-      // If content script not loaded, open popup with just selected text
+  if (info.menuItemId === "add-to-calendar") {
+    // Try to send message to content script to get selected text
+    try {
+      chrome.tabs.sendMessage(tab.id, { action: "getSelectedText" }, response => {
+        if (chrome.runtime.lastError) {
+          console.log("Error sending message to content script:", chrome.runtime.lastError.message);
+          // Open popup with just the selected text if available
+          openPopupWithDetails(info.selectionText || '', {
+            title: tab.title || '',
+            date: '',
+            time: '',
+            location: ''
+          });
+        }
+        // The success response will come via the processSelectedText action
+      });
+    } catch (error) {
+      console.error("Failed to communicate with content script:", error);
+      // Fall back to selection text if available
+      openPopupWithDetails(info.selectionText || '', {
+        title: tab.title || '',
+        date: '',
+        time: '',
+        location: ''
+      });
+    }
+  }
+});
+
+// Open popup when extension icon is clicked
+chrome.action.onClicked.addListener(tab => {
+  try {
+    chrome.tabs.sendMessage(tab.id, { action: "getSelectedText" }, response => {
       if (chrome.runtime.lastError) {
-        openPopupWithDetails(info.selectionText || '');
+        console.log("Error sending message to content script:", chrome.runtime.lastError.message);
+        // Open popup with just the selected text if available
+        openPopupWithDetails('', {
+          title: tab.title || '',
+          date: '',
+          time: '',
+          location: ''
+        });
       }
+    });
+  } catch (error) {
+    console.error("Failed to communicate with content script:", error);
+    // Fall back to selection text if available
+    openPopupWithDetails('', {
+      title: tab.title || '',
+      date: '',
+      time: '',
+      location: ''
     });
   }
 });
 
-// Open popup with provided details
-function openPopupWithDetails(selectedText, eventDetails = null) {
-  let url = `src/html/popup.html?text=${encodeURIComponent(selectedText)}`;
+// Helper function to open popup with event details
+function openPopupWithDetails(selectedText, eventDetails) {
+  const width = 380;
+  const height = 480; // Default height
+
+  // Construct URL for the popup with parameters
+  const popupURL = chrome.runtime.getURL("src/html/popup.html") + 
+    `?text=${encodeURIComponent(selectedText || "")}` + 
+    `&title=${encodeURIComponent(eventDetails.title || "")}` + 
+    `&date=${encodeURIComponent(eventDetails.date || "")}` + 
+    `&time=${encodeURIComponent(eventDetails.time || "")}` + 
+    `&location=${encodeURIComponent(eventDetails.location || "")}`;
   
-  // Add event details to URL if available
-  if (eventDetails) {
-    if (eventDetails.title) url += `&title=${encodeURIComponent(eventDetails.title)}`;
-    if (eventDetails.date) url += `&date=${encodeURIComponent(eventDetails.date)}`;
-    if (eventDetails.time) url += `&time=${encodeURIComponent(eventDetails.time)}`;
-    if (eventDetails.location) url += `&location=${encodeURIComponent(eventDetails.location)}`;
-  }
-  
-  // Open popup window
+  // Create a popup window
   chrome.windows.create({
-    url: url,
-    type: 'popup',
-    width: 370,
-    height: 420
+    url: popupURL,
+    type: "popup",
+    width: width,
+    height: height,
+    focused: true
+  }, (window) => {
+    // Resize the window after it's loaded to fit content
+    if (window && window.id) {
+      chrome.storage.local.set({ 
+        popupWindowId: window.id,
+        needsResize: true // Flag to indicate window needs resizing
+      });
+    }
   });
 }
 
-// Message handlers
+// Listen for messages from content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "processSelectedText") {
-    // Handle event details from content script
-    openPopupWithDetails(message.selectedText, message.eventDetails);
+    // Open popup with extracted details
+    openPopupWithDetails(message.selectedText || '', message.eventDetails || {});
   }
   else if (message.action === "addToCalendar") {
     // Handle adding event to calendar

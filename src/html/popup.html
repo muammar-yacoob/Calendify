@@ -72,6 +72,17 @@
       background-color: #aecbfa;
       box-shadow: 0 2px 6px rgba(138, 180, 248, 0.4);
     }
+    button:disabled {
+      background-color: #5f6368;
+      opacity: 0.5;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    button:disabled:hover {
+      background-color: #5f6368;
+      box-shadow: none;
+      transform: none;
+    }
     .notification {
       position: fixed;
       bottom: 8px;
@@ -119,6 +130,6 @@
   </div>
   <div id="notification" class="notification"></div>
 
-  <script src="../js/popup.js"></script>
+  <script type="module" src="../js/popup.js"></script>
 </body>
 </html>
