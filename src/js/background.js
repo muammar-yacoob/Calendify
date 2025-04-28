@@ -239,33 +239,64 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // Create Google Calendar URL with event details
 function createGoogleCalendarUrl(eventDetails) {
+  console.log("Creating Google Calendar URL with event details:", eventDetails);
+  
   const baseUrl = 'https://calendar.google.com/calendar/render';
   const action = 'action=TEMPLATE';
   
   // Format title
-  const title = encodeURIComponent(eventDetails.title || '');
+  const title = encodeURIComponent(eventDetails.title || 'New Event');
   
   // Format dates
   let dates = '';
   if (eventDetails.date) {
-    const startDate = eventDetails.date.replace(/-/g, ''); // YYYYMMDD format
-    let endDate = startDate;
+    // Make sure date is in YYYY-MM-DD format
+    let dateStr = eventDetails.date;
+    // Convert any other formats to YYYY-MM-DD
+    if (!dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      try {
+        const dateObj = new Date(dateStr);
+        if (!isNaN(dateObj.getTime())) {
+          dateStr = dateObj.toISOString().split('T')[0];
+        }
+      } catch (e) {
+        console.error("Error parsing date:", e);
+      }
+    }
     
-    // Add time if provided
-    if (eventDetails.time) {
-      const timeNoColon = eventDetails.time.replace(':', '');
-      dates += `T${timeNoColon}00`;
-      endDate = startDate;
-      dates += `/${endDate}T${timeNoColon}00`;
+    // Convert to YYYYMMDD format for Google Calendar
+    const startDate = dateStr.replace(/-/g, '');
+    
+    // Handle time if provided
+    if (eventDetails.time && eventDetails.time.match(/^\d{1,2}:\d{2}$/)) {
+      // Format: HH:MM
+      const timeParts = eventDetails.time.split(':');
+      const hours = timeParts[0].padStart(2, '0');
+      const minutes = timeParts[1];
+      
+      // Create start datetime
+      dates = `${startDate}T${hours}${minutes}00`;
+      
+      // Create end datetime (1 hour later by default)
+      const endHour = (parseInt(hours) + 1) % 24;
+      const endTime = `${endHour.toString().padStart(2, '0')}${minutes}00`;
+      dates += `/${startDate}T${endTime}`;
     } else {
       // All day event
-      dates += `/${endDate}`;
+      dates = `${startDate}/${startDate}`;
     }
+  } else {
+    // If no date provided, use today's date
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = (today.getMonth() + 1).toString().padStart(2, '0');
+    const day = today.getDate().toString().padStart(2, '0');
+    dates = `${year}${month}${day}/${year}${month}${day}`;
   }
   
   // Format location and description
   const location = encodeURIComponent(eventDetails.location || '');
-  const description = encodeURIComponent(eventDetails.description || '');
+  const details = encodeURIComponent(eventDetails.text || '');
   
   // Construct URL
   const params = [
@@ -273,10 +304,12 @@ function createGoogleCalendarUrl(eventDetails) {
     `text=${title}`,
     `dates=${dates}`,
     `location=${location}`,
-    `details=${description}`
+    `details=${details}`
   ].join('&');
   
-  return `${baseUrl}?${params}`;
+  const finalUrl = `${baseUrl}?${params}`;
+  console.log("Google Calendar URL created:", finalUrl);
+  return finalUrl;
 }
 
 async function fetchSummary(videoUrl, tab) {
