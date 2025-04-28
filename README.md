@@ -13,9 +13,7 @@
 </div>
 
 ## ✨ What it does
-- Automatically detects dates and events on web pages
-- One-click to add events to your Google Calendar
-- Works across all websites
+- Chrome extention to detect dates on web pages and saves them to your Google Calendar
 
 ## 🚀 Quick Start
 Watch the [demo video](https://youtube.com/shorts/DnWywDT0na8)

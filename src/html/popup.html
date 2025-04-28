@@ -1,22 +1,124 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <link rel="stylesheet" href="../styles/styles.css" as="style">
-  <script src="popup.js" defer></script>
+  <title>Add to Calendar</title>
+  <link rel="stylesheet" href="../styles/styles.css">
+  <style>
+    body {
+      width: 350px;
+      padding: 10px;
+      background-color: #202124;
+      color: #e8eaed;
+      margin: 0;
+      font-size: 13px;
+      height: 400px;
+      overflow: hidden;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    h2 {
+      margin: 0 0 4px 0;
+      font-size: 16px;
+    }
+    label {
+      font-size: 12px;
+      margin-bottom: 1px;
+      display: block;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 6px;
+      margin-top: 1px;
+      background-color: #303134;
+      color: #e8eaed;
+      border: 1px solid #5f6368;
+      border-radius: 8px;
+      box-sizing: border-box;
+      font-size: 12px;
+    }
+    textarea {
+      height: 60px;
+      resize: none;
+    }
+    input:focus, textarea:focus {
+      border-color: #8ab4f8;
+      outline: none;
+    }
+    .form-row {
+      margin-bottom: 4px;
+    }
+    .form-row.flex {
+      display: flex;
+      gap: 8px;
+    }
+    .form-col {
+      flex: 1;
+    }
+    button {
+      padding: 8px;
+      background-color: #8ab4f8;
+      color: #202124;
+      border: none;
+      border-radius: 20px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-top: 8px;
+    }
+    button:hover {
+      background-color: #aecbfa;
+      box-shadow: 0 2px 6px rgba(138, 180, 248, 0.4);
+    }
+    .notification {
+      position: fixed;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 12px;
+      background-color: #8ab4f8;
+      color: #202124;
+      border-radius: 16px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      font-size: 12px;
+    }
+    .notification.show {
+      opacity: 1;
+    }
+  </style>
 </head>
 <body>
   <div class="container">
-    <h1>YouTube Summary</h1>
-    <div class="video-info">
-      <h2 id="videoTitle"></h2>
-      <a id="videoUrl" target="_blank">Open Video</a>
+    <h2>Add to Calendar</h2>
+    <div class="form-row">
+      <label for="eventTitle">Event Title:</label>
+      <input type="text" id="eventTitle" placeholder="Enter event title">
     </div>
-    <div class="summary-container">
-      <p id="summary"></p>
-      <button id="copy">Copy Summary</button>
+    <div class="form-row flex">
+      <div class="form-col">
+        <label for="eventDate">Date:</label>
+        <input type="date" id="eventDate">
+      </div>
+      <div class="form-col">
+        <label for="eventTime">Time:</label>
+        <input type="time" id="eventTime">
+      </div>
     </div>
-    <div id="notification" class="notification"></div>
+    <div class="form-row">
+      <label for="eventLocation">Location:</label>
+      <input type="text" id="eventLocation" placeholder="Enter location (optional)">
+    </div>
+    <div class="form-row">
+      <label for="eventDescription">Description:</label>
+      <textarea id="eventDescription" rows="3" placeholder="Enter event description"></textarea>
+    </div>
+    <button id="addButton">Add to Calendar</button>
   </div>
+  <div id="notification" class="notification"></div>
+
+  <script src="../js/popup.js"></script>
 </body>
 </html>

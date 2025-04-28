@@ -9,13 +9,15 @@
     "storage",
     "contextMenus",
     "activeTab",
-    "notifications",
+    "notifications"
+  ],
+  "optional_permissions": [
     "identity"
   ],
   "oauth2": {
     "client_id": "YOUR_CLIENT_ID.apps.googleusercontent.com",
     "scopes": [
-      "https://www.googleapis.com/auth/youtube.force-ssl"
+      "https://www.googleapis.com/auth/calendar"
     ]
   },
   "background": {
@@ -24,13 +26,13 @@
   },
   "action": {
     "default_popup": "src/html/popup.html",
-"default_icon": {
-  "48": "res/icons/icon48.png",
-  "128": "res/icons/icon128.png"
-}
+    "default_icon": {
+      "48": "res/icons/icon48.png",
+      "128": "res/icons/icon128.png"
+    }
   },
   "content_scripts": [{
-    "matches": ["https://www.youtube.com/*"],
+    "matches": ["*://*/*"],
     "js": ["src/js/content.js"]
   }],
   "icons": {
