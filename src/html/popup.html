@@ -3,6 +3,7 @@
 <head>
   <title>Calendify</title>
   <style>
+    /* CSS Variables for theming and consistency */
     :root {
       --bg-color: #202124;
       --text-color: #e8eaed;
@@ -10,11 +11,18 @@
       --border-color: #5f6368;
       --accent-color: #8ab4f8;
       --accent-hover: #aecbfa;
-      --padding: 8px;
-      --spacing: 4px;
+      --spacing-xs: 2px;
+      --spacing-sm: 4px;
+      --spacing-md: 8px;
+      --spacing-lg: 12px;
       --border-radius: 6px;
+      --font-size-xs: 10px;
+      --font-size-sm: 11px;
+      --font-size-md: 12px;
+      --font-size-lg: 14px;
     }
     
+    /* Reset and base styles */
     * {
       box-sizing: border-box;
       margin: 0;
@@ -25,55 +33,53 @@
       background-color: var(--bg-color);
       color: var(--text-color);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-      font-size: 12px;
-      padding: var(--padding);
+      font-size: var(--font-size-md);
+      padding: var(--spacing-md);
       width: 100%;
       overflow: hidden;
       display: flex;
       flex-direction: column;
     }
     
+    /* Layout containers */
     .container {
       display: flex;
       flex-direction: column;
       width: 100%;
-      gap: var(--spacing);
+      gap: var(--spacing-sm);
     }
     
+    /* Form elements */
     .form-row {
       width: 100%;
-      margin-bottom: var(--spacing);
+      margin-bottom: var(--spacing-sm);
     }
     
     .form-row.flex {
       display: flex;
-      gap: var(--spacing);
+      gap: var(--spacing-sm);
     }
     
     .form-col {
       flex: 1;
     }
     
+    /* Labels and inputs */
     label {
       display: block;
-      font-size: 11px;
-      margin-bottom: 2px;
+      font-size: var(--font-size-sm);
+      margin-bottom: var(--spacing-xs);
       font-weight: bold;
     }
     
     input, textarea {
       width: 100%;
-      padding: 4px 6px;
+      padding: var(--spacing-xs) var(--spacing-md);
       background-color: var(--input-bg);
       color: var(--text-color);
       border: 1px solid var(--border-color);
       border-radius: var(--border-radius);
-      font-size: 12px;
-    }
-    
-    input:focus, textarea:focus {
-      border-color: var(--accent-color);
-      outline: none;
+      font-size: var(--font-size-md);
     }
     
     textarea {
@@ -81,9 +87,15 @@
       resize: none;
     }
     
+    input:focus, textarea:focus {
+      border-color: var(--accent-color);
+      outline: none;
+    }
+    
+    /* Button styles */
     button {
       width: 100%;
-      padding: 6px;
+      padding: var(--spacing-sm);
       background-color: var(--accent-color);
       color: var(--bg-color);
       border: none;
@@ -91,7 +103,7 @@
       font-weight: bold;
       cursor: pointer;
       transition: all 0.2s ease;
-      margin-bottom: var(--spacing);
+      margin-bottom: var(--spacing-md);
     }
     
     button:hover {
@@ -106,21 +118,26 @@
       box-shadow: none;
     }
     
+    /* Support section */
     #supportContainer {
       width: 100%;
-      padding-top: 8px;
-      margin-top: 8px;
+      padding: var(--spacing-md) 0;
+      margin-top: var(--spacing-md);
       border-top: 1px solid var(--border-color);
+    }
+    
+    .support-flex {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
-      justify-content: space-between;
-      min-height: 24px;
+      gap: var(--spacing-md);
+      width: 100%;
     }
     
     .support-text {
-      font-size: 10px;
+      font-size: var(--font-size-xs);
       flex: 1;
-      margin-right: 8px;
+      min-width: 150px;
       overflow-wrap: break-word;
       word-wrap: break-word;
       hyphens: auto;
@@ -132,26 +149,33 @@
       color: var(--bg-color);
       border: none;
       border-radius: var(--border-radius);
-      padding: 4px 10px;
-      margin: 2px 0;
-      font-size: 10px;
+      padding: var(--spacing-xs) var(--spacing-md);
+      margin: var(--spacing-xs) 0;
+      font-size: var(--font-size-xs);
       font-weight: bold;
       text-decoration: none;
       white-space: nowrap;
+      transition: all 0.2s ease;
     }
     
+    .support-button:hover {
+      background-color: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+    
+    /* Notification styles */
     .notification {
       position: fixed;
       bottom: 4px;
       left: 50%;
       transform: translateX(-50%);
-      padding: 4px 10px;
+      padding: var(--spacing-xs) var(--spacing-md);
       background-color: var(--accent-color);
       color: var(--bg-color);
       border-radius: 12px;
       opacity: 0;
       transition: opacity 0.3s;
-      font-size: 11px;
+      font-size: var(--font-size-sm);
       max-width: 90%;
       text-align: center;
     }
@@ -188,7 +212,14 @@
     <button id="addButton">Add to Calendar</button>
   </div>
   
-  <div id="supportContainer"></div>
+  <!-- Support section with pre-defined structure -->
+  <div id="supportContainer">
+    <div class="support-flex">
+      <div id="supportText" class="support-text"></div>
+      <a id="supportButton" class="support-button" target="_blank" href="#"></a>
+    </div>
+  </div>
+  
   <div id="notification" class="notification"></div>
 
   <script type="module" src="../js/popup.js"></script>

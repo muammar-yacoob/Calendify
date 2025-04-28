@@ -185,8 +185,8 @@ chrome.action.onClicked.addListener(async (tab) => {
 
 // Helper function to open popup with event details
 function openPopup(eventDetails) {
-  const width = 380;
-  const height = 480; // Default height
+  const width = 350;
+  const height = 350; // Reduced height from 380 to 370
 
   // Construct URL for the popup with parameters
   let popupURL = chrome.runtime.getURL("src/html/popup.html");
@@ -212,21 +212,13 @@ function openPopup(eventDetails) {
   
   console.log("Opening popup with URL:", popupURL);
   
-  // Create a popup window
+  // Create a popup window with fixed size
   chrome.windows.create({
     url: popupURL,
     type: "popup",
     width: width,
     height: height,
     focused: true
-  }, (window) => {
-    // Resize the window after it's loaded to fit content
-    if (window && window.id) {
-      chrome.storage.local.set({ 
-        popupWindowId: window.id,
-        needsResize: true // Flag to indicate window needs resizing
-      });
-    }
   });
 }
 

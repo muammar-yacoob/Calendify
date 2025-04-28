@@ -71,9 +71,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   eventDateEl.addEventListener('input', validateForm);
   validateForm();
   
-  // Adjust window size
-  setTimeout(() => adjustWindowSize(), 200);
-  
   // Handle add to calendar button click
   addButtonEl.addEventListener('click', () => {
     if (!validateForm()) {
@@ -107,7 +104,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   loadCompactSupportLinks();
 });
 
-// Load support links in a more compact format
+// Show notification message
+function showNotification(message, type = 'success') {
+  const notificationEl = document.getElementById('notification');
+  notificationEl.textContent = message;
+  notificationEl.className = `notification ${type}`;
+  notificationEl.style.display = 'block';
+  
+  setTimeout(() => {
+    notificationEl.style.display = 'none';
+  }, 3000);
+}
+
+// Function to load support links in a more compact way
 async function loadCompactSupportLinks() {
   try {
     let supportLinksModule;
@@ -127,10 +136,12 @@ async function loadCompactSupportLinks() {
     const manifest = await (await fetch(chrome.runtime.getURL('manifest.json'))).json();
     const extensionName = manifest.name || 'Calendify';
     
-    // Get the support container from the HTML
-    const supportContainer = document.getElementById('supportContainer');
-    if (!supportContainer) {
-      console.error('Support container not found');
+    // Get the support elements from the HTML
+    const supportText = document.getElementById('supportText');
+    const supportButton = document.getElementById('supportButton');
+    
+    if (!supportText || !supportButton) {
+      console.error('Support elements not found');
       return;
     }
     
@@ -141,63 +152,23 @@ async function loadCompactSupportLinks() {
     
     const { category } = randomCategoryInfo;
     
-    // Create flexible container to better handle wrapping
-    const flexContainer = document.createElement('div');
-    flexContainer.style.display = 'flex';
-    flexContainer.style.flexWrap = 'wrap';
-    flexContainer.style.alignItems = 'center';
-    flexContainer.style.width = '100%';
-    flexContainer.style.gap = '6px';
-    flexContainer.style.padding = '2px 0';  // Add vertical padding within container
-    
-    // Create text element - compact
-    const textEl = document.createElement('div');
-    textEl.classList.add('support-text');
-    
-    // Get a message but ensure it's not too long
+    // Set text content - will wrap automatically based on CSS
     let message = supportLinksModule.getRandomMessage(category.messages);
-    // No need to truncate as we're using wrapping now
-    textEl.textContent = message;
+    supportText.textContent = message;
     
-    // Create button element - compact
-    const buttonEl = document.createElement('a');
-    buttonEl.classList.add('support-button');
-    buttonEl.href = category.getUrl();
-    buttonEl.target = '_blank';
-    buttonEl.textContent = `${category.title} ${category.emoji}`;
-    
-    // Add elements to the support container in a way that allows wrapping
-    flexContainer.appendChild(textEl);
-    flexContainer.appendChild(buttonEl);
-    supportContainer.appendChild(flexContainer);
-    
-    // Adjust window size after adding support section
-    setTimeout(() => adjustWindowSize(), 50);
+    // Set button properties
+    supportButton.textContent = `${category.title} ${category.emoji}`;
+    supportButton.href = category.getUrl();
+    supportButton.target = '_blank';
+    supportButton.rel = 'noopener noreferrer';
   } catch (error) {
     console.error('Error loading support utilities:', error);
     
     // Add a simple fallback if there's an error
-    const supportContainer = document.getElementById('supportContainer');
-    if (supportContainer) {
-      supportContainer.textContent = 'Thanks for using Calendify! ⭐';
-      supportContainer.style.fontSize = '10px';
-      supportContainer.style.textAlign = 'center';
+    const supportText = document.getElementById('supportText');
+    if (supportText) {
+      supportText.textContent = 'Thanks for using Calendify! ⭐';
     }
-  }
-}
-
-// Adjust window size to fit content
-function adjustWindowSize() {
-  const contentHeight = document.body.scrollHeight;
-  if (contentHeight > 0) {
-    // Ensure there's enough room for all content including support section
-    // Add extra padding to prevent clipping
-    const targetHeight = Math.min(Math.max(contentHeight + 45, 340), 490);
-    chrome.windows.getCurrent((window) => {
-      if (window) {
-        chrome.windows.update(window.id, { height: targetHeight });
-      }
-    });
   }
 }
 
@@ -319,20 +290,6 @@ function getMonthNumber(monthName) {
     'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'
   };
   return months[monthName.toLowerCase().substring(0, 3)];
-}
-
-// Show notification
-function showNotification(message, type = 'success') {
-  const notification = document.getElementById('notification');
-  if (!notification) {
-    console.error('Notification element not found!');
-    return;
-  }
-  
-  notification.textContent = message;
-  notification.style.backgroundColor = type === 'error' ? '#f28b82' : '#8ab4f8';
-  notification.classList.add('show');
-  setTimeout(() => notification.classList.remove('show'), 3000);
 }
 
 // Check if text suggests this is an online event
