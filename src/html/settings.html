@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="../styles/styles.css">
+  <script src="../js/settings.js" defer></script>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="../../res/icons/icon48.png" alt="Calendify" class="header-icon">
+      <div class="header-text">
+        <h1 id="extensionName">Calendify</h1>
+        <span id="extensionVersion" class="version-tag"></span>
+      </div>
+    </div>
+
+    <div class="setting-group">
+      <label for="language">Summary Language</label>
+      <select id="language"></select>
+    </div>
+
+    <div class="setting-group">
+      <label for="level">Summary Detail</label>
+      <select id="level">
+        <option value="brief">Brief (key points)</option>
+        <option value="detailed">Detailed (main content)</option>
+        <option value="full">Full (complete transcript)</option>
+      </select>
+    </div>
+
+    <button id="save" disabled>Save Settings</button>
+  </div>
+</body>
+</html>
