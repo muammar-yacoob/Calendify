@@ -68,28 +68,36 @@ function extractEventData() {
   if (!data.date) data.date = findDate();
   if (!data.time) data.time = findTime();
   
-  // 3. Find meeting link if available
-  const meetingInfo = findMeetingLink();
+  // 3. Only look for meeting links if we have strong evidence this is an online event
+  // This helps prevent falsely identifying regular links as meeting links
+  const isLikelyOnlineEvent = checkIfOnlineEvent();
   
-  if (meetingInfo && typeof meetingInfo === 'object') {
-    // Only set meetingLink and online status if we have a valid URL
-    if (meetingInfo.url) {
-      data.isOnline = true;
-      data.meetingLink = meetingInfo.url;
-      
-      // Add meeting link to description
-      if (data.description) {
-        data.description += '\n\n';
-      }
-      data.description += `Meeting Link: ${data.meetingLink}`;
-      
-      // Only set location to "Online Event" if we actually have a meeting URL
-      if (meetingInfo.platform && meetingInfo.platform !== 'Conference') {
-        data.location = `Online Event (${meetingInfo.platform})`;
-      } else {
-        data.location = "Online Event";
+  if (isLikelyOnlineEvent === true) {
+    console.log('This appears to be an online event, looking for meeting links...');
+    const meetingInfo = findMeetingLink();
+    
+    if (meetingInfo && typeof meetingInfo === 'object') {
+      // Only set meetingLink and online status if we have a valid URL
+      if (meetingInfo.url) {
+        data.isOnline = true;
+        data.meetingLink = meetingInfo.url;
+        
+        // Add meeting link to description
+        if (data.description) {
+          data.description += '\n\n';
+        }
+        data.description += `Meeting Link: ${data.meetingLink}`;
+        
+        // Only set location to "Online Event" if we actually have a meeting URL
+        if (meetingInfo.platform && meetingInfo.platform !== 'Conference') {
+          data.location = `Online Event (${meetingInfo.platform})`;
+        } else {
+          data.location = "Online Event";
+        }
       }
     }
+  } else {
+    console.log('This does not appear to be an online event, skipping meeting link detection');
   }
   
   // 4. Find physical location if not already determined to be online
@@ -415,38 +423,29 @@ function findLocation() {
 
 // Find online meeting links like Zoom, Teams, Google Meet, etc.
 function findMeetingLink() {
-  // First check if this is likely an online event
-  const isOnlineEvent = checkIfOnlineEvent();
-  
-  // If we're pretty sure this is not an online event, don't extract meeting links
-  if (isOnlineEvent === false) {
-    console.log('This appears to be an in-person event, skipping meeting link extraction');
-    return null;
-  }
+  console.log('Looking for meeting links...');
   
   // Find all links on the page
   const links = Array.from(document.getElementsByTagName('a'));
   
-  // Common patterns for meeting links - updated with more variations
+  // Common patterns for meeting links - strict patterns to avoid false positives
   const meetingPatterns = [
     // Zoom (including webinar and registration links)
-    { type: 'Zoom', regex: /zoom\.us\/(j|w|webinar|meeting|register)\/([a-zA-Z0-9?=_-]+)/i },
+    { type: 'Zoom', regex: /zoom\.us\/(j|w|webinar|meeting|register)\/([a-zA-Z0-9?=_-]+)/i, confidence: 'high' },
     // Microsoft Teams
-    { type: 'Teams', regex: /teams\.microsoft\.com\/l\/(meetup-join|meet|meeting)/i },
+    { type: 'Teams', regex: /teams\.microsoft\.com\/l\/(meetup-join|meet|meeting)/i, confidence: 'high' },
     // Google Meet
-    { type: 'Meet', regex: /meet\.google\.com\/[a-z]+-[a-z]+-[a-z]+/i },
+    { type: 'Meet', regex: /meet\.google\.com\/[a-z]+-[a-z]+-[a-z]+/i, confidence: 'high' },
     // Webex
-    { type: 'Webex', regex: /webex\.com\/(meet|j|join|meeting)/i },
+    { type: 'Webex', regex: /webex\.com\/(meet|j|join|meeting)/i, confidence: 'high' },
     // GoToMeeting/GoToWebinar
-    { type: 'GoToMeeting', regex: /goto(meeting|webinar)\.com/i },
-    // Cisco
-    { type: 'Cisco', regex: /webex\.com/i },
+    { type: 'GoToMeeting', regex: /goto(meeting|webinar)\.com/i, confidence: 'high' },
     // Skype
-    { type: 'Skype', regex: /join\.skype\.com/i },
-    // Meetup
-    { type: 'Meetup', regex: /meetup\.com\/[^\/]+\/events\/\d+/i },
-    // Generic conference link patterns
-    { type: 'Conference', regex: /\/conference|\/meeting|\/webinar|\/call|\/join|\/event/i }
+    { type: 'Skype', regex: /join\.skype\.com/i, confidence: 'high' },
+    // Meetup - but only if we're sure it's an online event
+    { type: 'Meetup', regex: /meetup\.com\/[^\/]+\/events\/\d+/i, confidence: 'medium' },
+    // Generic conference link patterns - low confidence to avoid false positives
+    { type: 'Conference', regex: /\/webinar|\/conference\/join/i, confidence: 'low' }
   ];
   
   console.log('Scanning links for meeting URLs...');
@@ -454,98 +453,98 @@ function findMeetingLink() {
   // Check each link against our patterns
   for (const link of links) {
     const href = link.href;
-    if (!href) continue;
+    if (!href || href.length < 10) continue; // Skip empty or very short URLs
     
-    console.log(`Checking link: ${href.substring(0, 50)}${href.length > 50 ? '...' : ''}`);
+    // Exclude common non-meeting URLs to avoid false positives
+    if (href.match(/facebook\.com|twitter\.com|instagram\.com|linkedin\.com|youtube\.com|tiktok\.com/i)) {
+      continue;
+    }
+    
+    // Look for links that are clearly about joining or registering for online meetings
+    const linkText = link.textContent.toLowerCase();
+    const isJoinLink = linkText.match(/\b(join|register|sign up|attend|online|virtual|zoom|teams|meet|webinar)\b/i);
     
     for (const pattern of meetingPatterns) {
       if (pattern.regex.test(href)) {
-        console.log(`Found ${pattern.type} meeting link:`, href);
-        // For registration links, store both the registration URL and the platform
-        if (href.includes('register') || href.includes('registration')) {
+        // Higher confidence for high-confidence patterns like Zoom, Meet, etc.
+        if (pattern.confidence === 'high') {
+          console.log(`Found high-confidence ${pattern.type} meeting link:`, href);
           return {
             platform: pattern.type,
-            url: href,
-            isRegistration: true
+            url: href
           };
         }
-        return {
-          platform: pattern.type,
-          url: href
-        };
+        
+        // For medium-confidence patterns, check if link text suggests it's for joining
+        if (pattern.confidence === 'medium' && isJoinLink) {
+          console.log(`Found medium-confidence ${pattern.type} meeting link with join text:`, href);
+          return {
+            platform: pattern.type,
+            url: href
+          };
+        }
+        
+        // For low-confidence patterns, require explicit join/register text
+        if (pattern.confidence === 'low' && isJoinLink && 
+            (linkText.includes('join') || linkText.includes('register') || linkText.includes('attend'))) {
+          console.log(`Found low-confidence ${pattern.type} meeting link with explicit join text:`, href);
+          return {
+            platform: pattern.type,
+            url: href
+          };
+        }
       }
     }
   }
   
-  // If no link found, try to find it in text content
+  // If no link found, try to find it in text content with high confidence patterns only
   const paragraphs = Array.from(document.querySelectorAll('p, span, div')).filter(el => {
     return el.offsetParent !== null;
   }).map(el => el.textContent.trim());
   
   for (const text of paragraphs) {
-    // Look for pasted meeting links - expanded with more variations
-    const linkMatch = text.match(/(https?:\/\/(?:zoom\.us\/[jwm]|zoom\.us\/webinar|zoom\.us\/register|teams\.microsoft\.com|meet\.google\.com|join\.skype\.com|webex\.com)[^\s]+)/i);
-    if (linkMatch) {
-      console.log('Found meeting link in text:', linkMatch[1]);
+    // Only look for explicit meeting URLs in text - high confidence patterns only
+    const meetLinkMatch = text.match(/https:\/\/meet\.google\.com\/[a-z]+-[a-z]+-[a-z]+/i);
+    const zoomLinkMatch = text.match(/https:\/\/([a-z0-9.-]+\.)?zoom\.us\/(j|w|webinar|meeting)\/[a-zA-Z0-9?=_-]+/i);
+    const teamsLinkMatch = text.match(/https:\/\/teams\.microsoft\.com\/l\/(meetup-join|meet|meeting)[^\s]*/i);
+    
+    if (meetLinkMatch) {
+      console.log('Found Google Meet link in text:', meetLinkMatch[0]);
       return {
-        platform: detectPlatform(linkMatch[1]),
-        url: linkMatch[1]
+        platform: 'Meet',
+        url: meetLinkMatch[0]
       };
     }
     
-    // Look for meeting IDs
+    if (zoomLinkMatch) {
+      console.log('Found Zoom link in text:', zoomLinkMatch[0]);
+      return {
+        platform: 'Zoom',
+        url: zoomLinkMatch[0]
+      };
+    }
+    
+    if (teamsLinkMatch) {
+      console.log('Found Teams link in text:', teamsLinkMatch[0]);
+      return {
+        platform: 'Teams',
+        url: teamsLinkMatch[0]
+      };
+    }
+    
+    // Look for meeting IDs with explicit meeting ID label
     const meetingIdMatch = text.match(/meeting\s+id:?\s*(\d{9,})/i);
     if (meetingIdMatch) {
       const meetingId = meetingIdMatch[1];
-      console.log('Found meeting ID:', meetingId);
-      // Return URL string directly to avoid object issues
+      console.log('Found Zoom meeting ID:', meetingId);
       return {
         platform: 'Zoom',
-        url: `Zoom Meeting ID: ${meetingId}`
+        url: `https://zoom.us/j/${meetingId}`
       };
     }
   }
   
-  // Alternate approach - look for registration buttons that might contain meeting links
-  const registrationButtons = Array.from(document.querySelectorAll('a.register, a.registration, a[href*="register"], a[href*="registration"], button:contains("Register"), a:contains("Register"), a:contains("Sign up")'));
-  
-  for (const button of registrationButtons) {
-    const href = button.href;
-    if (!href) continue;
-    
-    // Check if this button leads to a registration page for virtual events
-    for (const pattern of meetingPatterns) {
-      if (pattern.regex.test(href)) {
-        console.log(`Found registration link for ${pattern.type}:`, href);
-        return {
-          platform: pattern.type,
-          url: href,
-          isRegistration: true
-        };
-      }
-    }
-    
-    // If the button text suggests it's for an online event
-    const buttonText = button.textContent.toLowerCase();
-    if (buttonText.includes('webinar') || buttonText.includes('online') || 
-        buttonText.includes('virtual') || buttonText.includes('zoom') || 
-        buttonText.includes('teams') || buttonText.includes('meet')) {
-      console.log('Found registration button that appears to be for an online event:', href);
-      return {
-        platform: 'Registration',
-        url: href,
-        isRegistration: true
-      };
-    }
-  }
-  
-  // If we're pretty confident this is an online event but found no link
-  if (isOnlineEvent === true) {
-    console.log('This appears to be an online event, but no specific meeting link was found');
-    // Return null instead of an object with no URL
-    return null;
-  }
-  
+  console.log('No meeting link found');
   return null;
 }
 
@@ -554,46 +553,84 @@ function checkIfOnlineEvent() {
   // Look for explicit indicators in the page
   const pageText = document.body.textContent.toLowerCase();
   
-  // Strong indicators this is an online event
-  const onlineIndicators = [
+  // Strong indicators this is an online event (very specific phrases)
+  const strongOnlineIndicators = [
     'online event', 'virtual event', 'webinar', 
     'zoom meeting', 'teams meeting', 'google meet',
-    'join online', 'join virtually', 'attend virtually',
-    'online only', 'virtual conference', 'web conference',
-    'attend from anywhere', 'remote event'
+    'join online', 'join virtually', 'virtual conference',
+    'online only', 'virtual attendance', 'web conference',
+    'join remotely', 'remote attendance', 'attend from anywhere'
   ];
   
   // Strong indicators this is an in-person event
   const inPersonIndicators = [
     'in-person only', 'physical attendance', 'venue address',
     'parking available', 'venue location', 'attend in person',
-    'directions to venue', 'parking information'
+    'directions to venue', 'parking information', 'venue map',
+    'directions to the venue', 'physical location'
   ];
   
-  // Check for online event indicators
-  for (const indicator of onlineIndicators) {
+  // Count how many strong online indicators we find
+  let onlineIndicatorCount = 0;
+  for (const indicator of strongOnlineIndicators) {
     if (pageText.includes(indicator)) {
-      console.log('Online event indicator found:', indicator);
-      return true;
+      console.log('Strong online event indicator found:', indicator);
+      onlineIndicatorCount += 2; // Give more weight to strong indicators
+    }
+  }
+  
+  // Check for weaker online indicators (individual words that together suggest an online event)
+  const weakOnlineIndicators = ['virtual', 'online', 'zoom', 'teams', 'meet', 'web', 'remote'];
+  for (const indicator of weakOnlineIndicators) {
+    // Use word boundary check to avoid matching words like "meeting" when looking for "meet"
+    const regex = new RegExp(`\\b${indicator}\\b`, 'i');
+    if (regex.test(pageText)) {
+      console.log('Weak online event indicator found:', indicator);
+      onlineIndicatorCount += 1;
     }
   }
   
   // Check for in-person event indicators
+  let inPersonIndicatorCount = 0;
   for (const indicator of inPersonIndicators) {
     if (pageText.includes(indicator)) {
       console.log('In-person event indicator found:', indicator);
-      return false;
+      inPersonIndicatorCount += 2;
     }
   }
   
   // Look for specific elements that indicate online events
   const onlineElements = document.querySelectorAll(
-    '.online-event, .virtual-event, [class*="online"], [class*="virtual"]'
+    '.online-event, .virtual-event, [class*="online-"], [class*="virtual-"]'
   );
   
   if (onlineElements.length > 0) {
     console.log('Found elements suggesting an online event');
-    return true;
+    onlineIndicatorCount += 2;
+  }
+  
+  // Check meta tags or structured data for event type
+  const metaEventType = document.querySelector('meta[property="event:type"], [itemprop="eventAttendanceMode"]');
+  if (metaEventType) {
+    const eventTypeValue = metaEventType.getAttribute('content') || metaEventType.textContent;
+    if (eventTypeValue) {
+      if (/online|virtual|remote/i.test(eventTypeValue)) {
+        console.log('Found event type metadata indicating online event:', eventTypeValue);
+        onlineIndicatorCount += 3; // Strong signal from metadata
+      } else if (/in-?person|physical|offline|on-?site/i.test(eventTypeValue)) {
+        console.log('Found event type metadata indicating in-person event:', eventTypeValue);
+        inPersonIndicatorCount += 3;
+      }
+    }
+  }
+  
+  console.log(`Online indicators: ${onlineIndicatorCount}, In-person indicators: ${inPersonIndicatorCount}`);
+  
+  // Decide based on indicator counts
+  if (onlineIndicatorCount >= 3 && onlineIndicatorCount > inPersonIndicatorCount) {
+    return true;  // Likely an online event
+  } else if (inPersonIndicatorCount >= 2) {
+    return false; // Likely an in-person event
   }
   
   // If we can't determine for sure, return null (undetermined)

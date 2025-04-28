@@ -6,41 +6,40 @@
   <style>
     body {
       width: 350px;
-      padding: 10px;
+      padding: 8px;
       background-color: #202124;
       color: #e8eaed;
       margin: 0;
       font-size: 13px;
-      height: 400px;
       overflow: hidden;
     }
     .container {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 4px;
     }
     h2 {
-      margin: 0 0 4px 0;
-      font-size: 16px;
+      margin: 0 0 2px 0;
+      font-size: 15px;
     }
     label {
-      font-size: 12px;
-      margin-bottom: 1px;
+      font-size: 11px;
+      margin-bottom: 0;
       display: block;
     }
     input, textarea {
       width: 100%;
-      padding: 6px;
+      padding: 4px 6px;
       margin-top: 1px;
       background-color: #303134;
       color: #e8eaed;
       border: 1px solid #5f6368;
-      border-radius: 8px;
+      border-radius: 6px;
       box-sizing: border-box;
       font-size: 12px;
     }
     textarea {
-      height: 60px;
+      height: 50px;
       resize: none;
     }
     input:focus, textarea:focus {
@@ -48,25 +47,26 @@
       outline: none;
     }
     .form-row {
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
     .form-row.flex {
       display: flex;
-      gap: 8px;
+      gap: 6px;
     }
     .form-col {
       flex: 1;
     }
     button {
-      padding: 8px;
+      padding: 6px;
       background-color: #8ab4f8;
       color: #202124;
       border: none;
-      border-radius: 20px;
+      border-radius: 16px;
       font-weight: bold;
       cursor: pointer;
       transition: all 0.2s ease;
-      margin-top: 8px;
+      margin-top: 4px;
+      margin-bottom: 0;
     }
     button:hover {
       background-color: #aecbfa;
@@ -85,19 +85,24 @@
     }
     .notification {
       position: fixed;
-      bottom: 8px;
+      bottom: 4px;
       left: 50%;
       transform: translateX(-50%);
-      padding: 6px 12px;
+      padding: 4px 10px;
       background-color: #8ab4f8;
       color: #202124;
-      border-radius: 16px;
+      border-radius: 12px;
       opacity: 0;
       transition: opacity 0.3s;
-      font-size: 12px;
+      font-size: 11px;
     }
     .notification.show {
       opacity: 1;
+    }
+    /* Compact support section styling */
+    .support-section {
+      margin-top: 6px !important;
+      padding-top: 6px !important;
     }
   </style>
 </head>

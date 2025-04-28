@@ -304,14 +304,37 @@ function createGoogleCalendarUrl(eventDetails) {
     dates = `${year}${month}${day}/${year}${month}${day}`;
   }
   
+  // Check if we have a Google Meet link
+  const hasGoogleMeetLink = eventDetails.meetingLink && 
+    eventDetails.meetingLink.includes('meet.google.com');
+  
+  // If we have a Google Meet link, use the special add parameter
+  let conferenceParam = '';
+  if (hasGoogleMeetLink) {
+    // Extract the meeting code from the URL
+    const meetCode = eventDetails.meetingLink.match(/meet\.google\.com\/([a-z]+-[a-z]+-[a-z]+)/i);
+    if (meetCode && meetCode[1]) {
+      console.log("Adding Google Meet conference:", meetCode[1]);
+      conferenceParam = `&add=meet.google.com_${meetCode[1].replace(/-/g, '')}`;
+      
+      // Remove the meetingLink from location if it's there
+      if (eventDetails.location && eventDetails.location.includes(eventDetails.meetingLink)) {
+        eventDetails.location = eventDetails.location.replace(` | ${eventDetails.meetingLink}`, '');
+        if (eventDetails.location === 'Online Event') {
+          eventDetails.location = 'Google Meet';
+        }
+      }
+    }
+  }
+  
   // Format location and description
   const location = encodeURIComponent(eventDetails.location || '');
   
-  // Prepare description - include both the text and meeting link if available
+  // Prepare description - include meeting link if available and it's not a Google Meet link
   let description = eventDetails.description || eventDetails.text || '';
   
-  // If we have a meetingLink and it's not already in the description
-  if (eventDetails.meetingLink && !description.includes(eventDetails.meetingLink)) {
+  // If we have a meetingLink that's not Google Meet and it's not already in the description
+  if (eventDetails.meetingLink && !hasGoogleMeetLink && !description.includes(eventDetails.meetingLink)) {
     if (description) description += '\n\n';
     description += `Meeting Link: ${eventDetails.meetingLink}`;
   }
@@ -330,7 +353,8 @@ function createGoogleCalendarUrl(eventDetails) {
     `details=${details}`
   ].join('&');
   
-  const finalUrl = `${baseUrl}?${params}`;
+  // Add conference parameter if it exists
+  const finalUrl = `${baseUrl}?${params}${conferenceParam}`;
   console.log("Google Calendar URL created:", finalUrl);
   return finalUrl;
 }

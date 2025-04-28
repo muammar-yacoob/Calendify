@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', async () => {
-  console.log('Popup loaded - DOM Content Loaded');
+  console.log('Popup loaded');
   
   // Get parameters from URL and prefill form
   const urlParams = new URLSearchParams(window.location.search);
@@ -12,8 +12,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     meetingLink: urlParams.get('meetingLink') || '',
     description: urlParams.get('description') || ''
   };
-  
-  console.log('URL parameters:', prefilled);
   
   // Get form elements
   const eventTitleEl = document.getElementById('eventTitle');
@@ -32,7 +30,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (prefilled.location) {
     eventLocationEl.value = prefilled.location;
   } else if (prefilled.meetingLink) {
-    // If we have a meeting link but no location, mark as online event
     eventLocationEl.value = `Online Event | ${prefilled.meetingLink}`;
   }
   
@@ -41,138 +38,58 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // If we have a meeting link and it's not already in the description
   if (prefilled.meetingLink && !description.includes(prefilled.meetingLink)) {
-    console.log('Adding meeting link to description:', prefilled.meetingLink);
     if (description) description += '\n\n';
     description += `Meeting Link: ${prefilled.meetingLink}`;
   }
   
   eventDescriptionEl.value = description;
-  
-  // Store meeting link in a variable for later use instead of creating a DOM element
-  // This avoids the "Cannot read properties of null" error
   const meetingLinkValue = prefilled.meetingLink || '';
-  console.log('Stored meeting link value:', meetingLinkValue);
   
-  // Try to extract details from text if needed fields are missing
+  // Process text for missing fields if needed
   if (prefilled.text && (!prefilled.title || !prefilled.date || !prefilled.time || !prefilled.location)) {
     const extractedDetails = parseEventDetails(prefilled.text);
-    console.log('Extracted details:', extractedDetails);
     
     // Only use parsed values for empty fields
-    if (!prefilled.title && extractedDetails.title) {
-      eventTitleEl.value = extractedDetails.title;
-    }
-    if (!prefilled.date && extractedDetails.date) {
-      eventDateEl.value = extractedDetails.date;
-    }
-    if (!prefilled.time && extractedDetails.time) {
-      eventTimeEl.value = extractedDetails.time;
-    }
-    
-    // Handle location intelligently
-    if (!eventLocationEl.value && extractedDetails.location) {
-      eventLocationEl.value = extractedDetails.location;
-    }
-    
-    // Check if text contains online meeting indicators
-    if (!eventLocationEl.value && isLikelyOnlineEvent(prefilled.text)) {
-      eventLocationEl.value = "Online Event";
-    }
+    if (!prefilled.title && extractedDetails.title) eventTitleEl.value = extractedDetails.title;
+    if (!prefilled.date && extractedDetails.date) eventDateEl.value = extractedDetails.date;
+    if (!prefilled.time && extractedDetails.time) eventTimeEl.value = extractedDetails.time;
+    if (!eventLocationEl.value && extractedDetails.location) eventLocationEl.value = extractedDetails.location;
+    if (!eventLocationEl.value && isLikelyOnlineEvent(prefilled.text)) eventLocationEl.value = "Online Event";
   }
   
-  // If title or date are still not set, try harder
-  if (!eventTitleEl.value || !eventDateEl.value) {
-    console.log('Still missing title or date, trying harder to extract...');
-    // Try to extract from the entire document/tab title
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs && tabs[0] && tabs[0].title) {
-        const tabTitle = tabs[0].title;
-        console.log('Current tab title:', tabTitle);
-        
-        // If title is missing, use tab title
-        if (!eventTitleEl.value) {
-          eventTitleEl.value = tabTitle.split(' - ')[0].trim();
-        }
-        
-        // Extract date from tab title if possible
-        if (!eventDateEl.value) {
-          const dateRegex = /(\d{1,2})\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*/i;
-          const match = tabTitle.match(dateRegex);
-          if (match) {
-            const day = match[1].padStart(2, '0');
-            const month = getMonthNumber(match[2]);
-            const year = new Date().getFullYear();
-            eventDateEl.value = `${year}-${month}-${day}`;
-          }
-        }
-        
-        // Check if tab title suggests online event
-        if (!eventLocationEl.value && isLikelyOnlineEvent(tabTitle)) {
-          eventLocationEl.value = "Online Event";
-        }
-      }
-    });
-  }
-  
-  // Function to validate form and update button state
+  // Validate form and update button state
   function validateForm() {
     const isValid = eventTitleEl.value.trim() !== '' && eventDateEl.value.trim() !== '';
-    
-    // Update button state
     addButtonEl.disabled = !isValid;
     addButtonEl.style.opacity = isValid ? '1' : '0.5';
     addButtonEl.style.cursor = isValid ? 'pointer' : 'not-allowed';
-    
     return isValid;
   }
   
-  // Add input listeners to validate form on changes
+  // Add listeners and perform initial validation
   eventTitleEl.addEventListener('input', validateForm);
   eventDateEl.addEventListener('input', validateForm);
-  
-  // Initial validation
   validateForm();
   
-  // Check if we need to resize the window
-  chrome.storage.local.get(['needsResize', 'popupWindowId'], (data) => {
-    if (data.needsResize && data.popupWindowId) {
-      // Adjust window height to fit content
-      adjustWindowSize(data.popupWindowId);
-      // Reset the flag
-      chrome.storage.local.set({ needsResize: false });
-    } else {
-      // Always adjust size for better fit
-      setTimeout(() => {
-        chrome.windows.getCurrent((window) => {
-          if (window) {
-            adjustWindowSize(window.id);
-          }
-        });
-      }, 100);
-    }
-  });
-
+  // Adjust window size
+  setTimeout(() => adjustWindowSize(), 200);
+  
   // Handle add to calendar button click
   addButtonEl.addEventListener('click', () => {
-    // Check if form is valid before proceeding
     if (!validateForm()) {
       showNotification('Title and date are required', 'error');
       return;
     }
     
-    // Use the stored meeting link value from earlier in the script
     const eventDetails = {
       title: eventTitleEl.value,
       date: eventDateEl.value,
       time: eventTimeEl.value,
       location: eventLocationEl.value,
       description: eventDescriptionEl.value,
-      meetingLink: meetingLinkValue // Use the stored variable
+      meetingLink: meetingLinkValue
     };
 
-    console.log('Sending event details to calendar:', eventDetails);
-
-    // Send event details to background script
     chrome.runtime.sendMessage({
       action: "addToCalendar",
       eventDetails: eventDetails
@@ -186,80 +103,98 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
   
-  // Add support section with rating and various support links
-  loadSupportLinks();
+  // Add compact support section
+  loadCompactSupportLinks();
 });
 
-// Load support links separately to handle errors better
-async function loadSupportLinks() {
-  console.log('Loading support links...');
-  
+// Load support links in a more compact format
+async function loadCompactSupportLinks() {
   try {
-    // Try loading the module from different possible paths
     let supportLinksModule;
-    
     try {
       supportLinksModule = await import('./utils/supportLinks.js');
     } catch (e) {
-      console.warn('First import path failed, trying alternate path...', e);
       try {
         supportLinksModule = await import('../js/utils/supportLinks.js');
       } catch (e2) {
-        console.warn('Second import path failed, trying chrome.runtime.getURL...', e2);
         const modulePath = chrome.runtime.getURL('src/js/utils/supportLinks.js');
         supportLinksModule = await import(modulePath);
       }
     }
     
-    if (!supportLinksModule) {
-      throw new Error('Could not load support links module from any path');
-    }
+    if (!supportLinksModule) return;
     
-    console.log('Support links module loaded successfully');
-    
-    // Get the manifest to get the extension name
-    const manifestURL = chrome.runtime.getURL('manifest.json');
-    console.log('Fetching manifest from:', manifestURL);
-    
-    const response = await fetch(manifestURL);
-    const manifest = await response.json();
-    
+    const manifest = await (await fetch(chrome.runtime.getURL('manifest.json'))).json();
     const extensionName = manifest.name || 'Calendify';
-    console.log('Extension name from manifest:', extensionName);
     
-    // You can customize which support options to show by providing an array
-    const supportOptions = ['rate', 'github', 'website', 'donate'];
+    // Create a more compact support section
+    const supportSection = document.createElement('div');
+    supportSection.className = 'support-section';
+    supportSection.style.marginTop = '4px';
+    supportSection.style.paddingTop = '4px';
+    supportSection.style.borderTop = '1px solid #5f6368';
+    supportSection.style.display = 'flex';
+    supportSection.style.alignItems = 'center';
+    supportSection.style.justifyContent = 'space-between';
     
-    // Show support section if today is eligible
-    supportLinksModule.showSupportSectionIfEligible(extensionName, supportOptions, () => {
-      // Callback to resize window after adding support section
-      chrome.windows.getCurrent((window) => {
-        if (window) {
-          adjustWindowSize(window.id);
-        }
-      });
-    });
+    // Get a random category
+    const options = ['rate', 'github', 'website', 'donate'];
+    const randomCategoryInfo = supportLinksModule.getRandomCategory(options);
+    if (!randomCategoryInfo) return;
+    
+    const { category } = randomCategoryInfo;
+    
+    // Create text element - more compact
+    const textEl = document.createElement('div');
+    textEl.style.fontSize = '10px';
+    textEl.style.color = '#e8eaed';
+    textEl.style.flex = '1';
+    textEl.style.marginRight = '8px';
+    
+    // Get a shorter message
+    let message = supportLinksModule.getRandomMessage(category.messages);
+    // Truncate message if too long
+    if (message.length > 80) {
+      message = message.substring(0, 77) + '...';
+    }
+    textEl.textContent = message;
+    
+    // Create button element - even more compact
+    const buttonEl = document.createElement('a');
+    buttonEl.href = category.getUrl();
+    buttonEl.target = '_blank';
+    buttonEl.style.backgroundColor = '#8ab4f8';
+    buttonEl.style.color = '#202124';
+    buttonEl.style.border = 'none';
+    buttonEl.style.borderRadius = '4px';
+    buttonEl.style.padding = '3px 8px';
+    buttonEl.style.fontSize = '10px';
+    buttonEl.style.fontWeight = 'bold';
+    buttonEl.style.textDecoration = 'none';
+    buttonEl.style.whiteSpace = 'nowrap';
+    buttonEl.textContent = `${category.title} ${category.emoji}`;
+    
+    supportSection.appendChild(textEl);
+    supportSection.appendChild(buttonEl);
+    document.body.appendChild(supportSection);
+    
+    // Adjust window size after adding support section
+    setTimeout(() => adjustWindowSize(), 50);
   } catch (error) {
     console.error('Error loading support utilities:', error);
-    // Create a simple support section as fallback
-    const supportSection = document.createElement('div');
-    supportSection.style.marginTop = '20px';
-    supportSection.style.textAlign = 'center';
-    supportSection.style.borderTop = '1px solid #5f6368';
-    supportSection.style.paddingTop = '10px';
-    supportSection.textContent = 'Thanks for using Calendify! ⭐';
-    document.body.appendChild(supportSection);
   }
 }
 
 // Adjust window size to fit content
-function adjustWindowSize(windowId) {
+function adjustWindowSize() {
   const contentHeight = document.body.scrollHeight;
   if (contentHeight > 0) {
-    // Add padding and account for browser UI differences
-    const targetHeight = contentHeight + 40;
-    chrome.windows.update(windowId, {
-      height: targetHeight
+    // Use more compact sizing with less padding
+    const targetHeight = Math.min(Math.max(contentHeight + 20, 320), 480);
+    chrome.windows.getCurrent((window) => {
+      if (window) {
+        chrome.windows.update(window.id, { height: targetHeight });
+      }
     });
   }
 }
