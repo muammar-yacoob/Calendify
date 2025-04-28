@@ -1,21 +1,25 @@
-
 # Privacy Policy
 
 ## Data Collection
-- Calendify only stores the data you explicitly save:
-- Settings
-
-All data is stored locally in your browser using Chrome's storage sync API and is never transmitted to external servers.
+Calendify does not collect or store any personal data. The extension:
+- May temporarily store event details in your browser's local storage
+- Does not collect or transmit any browsing history
+- Does not use analytics or tracking services
 
 ## Data Usage
-- Your saved snippets are synced across your Chrome browsers when you're signed in
-- Data is only used to display your saved snippets and their sources
-- No analytics or tracking is implemented
+- All data processing happens locally in your browser
+- Event data is only used to pre-fill Google Calendar event forms
+- The extension does not maintain a database of your events
 
-## Data Access
-- Only you can access your saved snippets
-- Data is not shared with any third parties
-- No external services are used except Google's favicon service for website icons
+## Permissions
+- **Context Menu Access**: To provide the right-click "Add to Calendar" option
+- **Active Tab Access**: To extract event information from the current webpage
+- **Local Storage**: To temporarily hold event details until they're added to Google Calendar
+
+## Google Calendar Integration
+- Calendify generates URLs for Google Calendar
+- Your event data is only sent to Google when you click "Add to Calendar"
+- We do not have access to your Google account or calendar data
 
 ## Contact
 For any questions about this privacy policy, please create an issue on our [GitHub repository](../../issues).

@@ -1,31 +1,20 @@
-/**
- * Support messages, links and utilities for extension support/donation options
- * Easily reusable across different projects
- */
-
-// Configuration options
 export const displayOptions = {
   // Set to true to show the support section every day
   // Set to false to only show on days divisible by 3
   showDaily: true,
   
-  // Bright cyan color for all links
-  linkColor: "#00BFFF" // Deep Sky Blue (cyan)
+  linkColor: "#00BFFF" 
 };
 
-// Support links configuration - edit these values for each project
 export const config = {
   // Your personal/project details
-  author: "YourName",
+  author: "Spark Games",
   projectName: "Calendify",
-  projectRepo: "muammar-yacoob/calendify", // GitHub username/repo
-  website: "https://yourwebsite.com",     // Your portfolio or personal site
+  projectRepo: "muammar-yacoob/calendify",
+  website: "https://spark-games.co.uk",    
   
   // Your donation details
-  buyMeCoffeeUsername: "yourUsername",
-  kofiUsername: "yourUsername",
-  patreonUsername: "yourUsername",
-  paypalUsername: "yourUsername"
+  buyMeCoffeeUsername: "spark88",
 };
 
 // Link categories with their associated messages and URLs
@@ -86,10 +75,7 @@ export const supportCategories = {
     emoji: "☕",
     getUrl: (type) => {
       const links = {
-        coffee: `https://www.buymeacoffee.com/${config.buyMeCoffeeUsername}`,
-        kofi: `https://ko-fi.com/${config.kofiUsername}`,
-        patreon: `https://www.patreon.com/${config.patreonUsername}`,
-        paypal: `https://www.paypal.me/${config.paypalUsername}`
+        coffee: `https://www.buymeacoffee.com/${config.buyMeCoffeeUsername}`
       };
       return links[type] || links.coffee;
     },
@@ -218,8 +204,8 @@ export function createSupportSection(extensionName, options = ['rate', 'github',
   
   // For donation, randomly select one of the donation types
   if (key === 'donate') {
-    const donationTypes = ['coffee', 'kofi', 'patreon', 'paypal'];
-    const randomType = donationTypes[Math.floor(Math.random() * donationTypes.length)];
+    // Simply use coffee type for all donation links to avoid issues
+    const randomType = 'coffee';
     const link = createSupportLink(category, extensionName, randomType);
     supportSection.appendChild(link);
   } else {
@@ -242,24 +228,4 @@ export function shouldShowSupportSection() {
   const today = new Date();
   const day = today.getDate();
   return day % 3 === 0;
-}
-
-/**
- * Shows support section based on configured frequency
- * @param {string} extensionName The name of the extension
- * @param {Array} options Array of category keys to include
- * @param {Function} resizeCallback Optional callback for resizing window
- * @returns {void}
- */
-export function showSupportSectionIfEligible(extensionName, options = ['rate', 'github', 'website', 'donate'], resizeCallback = null) {
-  // Check if support section should be shown today based on configuration
-  if (shouldShowSupportSection()) {
-    const supportSection = createSupportSection(extensionName, options);
-    document.body.appendChild(supportSection);
-    
-    // Call resize callback if provided
-    if (typeof resizeCallback === 'function') {
-      setTimeout(resizeCallback, 50);
-    }
-  }
 } 

@@ -1,8 +1,3 @@
-var API_URL = 'http://localhost:3000/api/summarise';
-// var API_URL = 'https://Calendify.vercel.app';
-
-console.log('Background script loaded');
-
 // Setup context menu on installation
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
@@ -48,43 +43,6 @@ async function canAccessContentScript(tabId) {
   } catch (error) {
     console.error("Error checking tab:", error);
     return false;
-  }
-}
-
-// Safely get data from a tab
-async function getTabData(tabId) {
-  try {
-    // First check if we can access the content script
-    const hasContentScript = await canAccessContentScript(tabId);
-    if (!hasContentScript) {
-      console.log("Content script not available or not responding");
-      return null;
-    }
-    
-    // Now try to get the data
-    return new Promise(resolve => {
-      chrome.tabs.sendMessage(tabId, { action: "getSelection" }, response => {
-        if (chrome.runtime.lastError) {
-          console.log("Error getting selection data:", chrome.runtime.lastError.message);
-          resolve(null);
-          return;
-        }
-        
-        if (response && response.success) {
-          console.log("Got selection data:", response.eventDetails);
-          resolve(response.eventDetails);
-        } else {
-          console.log("Failed to get valid selection data");
-          resolve(null);
-        }
-      });
-      
-      // Timeout for safety
-      setTimeout(() => resolve(null), 1000);
-    });
-  } catch (error) {
-    console.error("Error getting tab data:", error);
-    return null;
   }
 }
 
@@ -185,8 +143,8 @@ chrome.action.onClicked.addListener(async (tab) => {
 
 // Helper function to open popup with event details
 function openPopup(eventDetails) {
-  const width = 350;
-  const height = 350; // Reduced height from 380 to 370
+  const width = 320;  // Adjusted width to provide proper spacing
+  const height = 410; // Increased dimensions to prevent squashing
 
   // Construct URL for the popup with parameters
   let popupURL = chrome.runtime.getURL("src/html/popup.html");
@@ -349,34 +307,4 @@ function createGoogleCalendarUrl(eventDetails) {
   const finalUrl = `${baseUrl}?${params}${conferenceParam}`;
   console.log("Google Calendar URL created:", finalUrl);
   return finalUrl;
-}
-
-async function fetchSummary(videoUrl, tab) {
-  console.log('Fetching summary for:', videoUrl);
-  try {
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ videoUrl })
-    });
-
-    const data = await response.json();
-    console.log('API response:', data);
-    saveSummary(data.summary, tab);
-  } catch (error) {
-    console.error('Fetch error:', error);
-    saveSummary(`Error: ${error.message}`, tab);
-  }
-}
-
-function saveSummary(summary, tab) {
-  console.log('Saving summary');
-  chrome.storage.sync.set({ 
-    lastSummary: {
-      text: summary,
-      url: tab.url,
-      title: tab.title
-    }
-  });
-  console.log('Summary saved');
 }

@@ -39,6 +39,7 @@
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      min-height: 380px;
     }
     
     /* Layout containers */
@@ -52,7 +53,7 @@
     /* Form elements */
     .form-row {
       width: 100%;
-      margin-bottom: var(--spacing-sm);
+      margin-bottom: 8px;
     }
     
     .form-row.flex {
@@ -80,10 +81,11 @@
       border: 1px solid var(--border-color);
       border-radius: var(--border-radius);
       font-size: var(--font-size-md);
+      margin-bottom: 4px;
     }
     
     textarea {
-      height: 45px;
+      height: 55px;
       resize: none;
     }
     
@@ -103,7 +105,8 @@
       font-weight: bold;
       cursor: pointer;
       transition: all 0.2s ease;
-      margin-bottom: var(--spacing-md);
+      margin-top: 6px;
+      margin-bottom: 12px;
     }
     
     button:hover {
@@ -121,8 +124,8 @@
     /* Support section */
     #supportContainer {
       width: 100%;
-      padding: var(--spacing-md) 0;
-      margin-top: var(--spacing-md);
+      padding-top: 8px;
+      margin-top: 8px;
       border-top: 1px solid var(--border-color);
     }
     
@@ -182,6 +185,12 @@
     
     .notification.show {
       opacity: 1;
+    }
+    
+    /* Ensure adequate spacing for the content */
+    .content-area {
+      padding: 12px;
+      min-height: 360px;
     }
   </style>
 </head>
