@@ -6,82 +6,201 @@ console.log('Background script loaded');
 // Setup context menu on installation
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
-    id: "add-to-calendar",
+    id: "addToCalendar",
     title: "Add to Calendar",
     contexts: ["selection", "page"]
   });
 });
 
-// Handle context menu clicks
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === "add-to-calendar") {
-    // Try to send message to content script to get selected text
-    try {
-      chrome.tabs.sendMessage(tab.id, { action: "getSelectedText" }, response => {
-        if (chrome.runtime.lastError) {
-          console.log("Error sending message to content script:", chrome.runtime.lastError.message);
-          // Open popup with just the selected text if available
-          openPopupWithDetails(info.selectionText || '', {
-            title: tab.title || '',
-            date: '',
-            time: '',
-            location: ''
-          });
-        }
-        // The success response will come via the processSelectedText action
-      });
-    } catch (error) {
-      console.error("Failed to communicate with content script:", error);
-      // Fall back to selection text if available
-      openPopupWithDetails(info.selectionText || '', {
-        title: tab.title || '',
-        date: '',
-        time: '',
-        location: ''
-      });
+// Check if we can access the content script
+async function canAccessContentScript(tabId) {
+  if (!tabId) return false;
+  
+  try {
+    // Get the tab info to check if it's a supported page
+    const tab = await chrome.tabs.get(tabId);
+    if (!tab.url || tab.url.startsWith('chrome:') || tab.url.startsWith('chrome-extension:')) {
+      console.log("Cannot access content script on this page type:", tab.url);
+      return false;
     }
+    
+    // Try to ping the content script
+    return new Promise(resolve => {
+      try {
+        chrome.tabs.sendMessage(tabId, { action: "ping" }, response => {
+          if (chrome.runtime.lastError) {
+            console.log("Content script not available:", chrome.runtime.lastError.message);
+            resolve(false);
+            return;
+          }
+          
+          console.log("Content script responded:", response);
+          resolve(!!response && response.success);
+        });
+        
+        // Set a timeout to handle cases where the message doesn't get a response
+        setTimeout(() => resolve(false), 500);
+      } catch (error) {
+        console.error("Error pinging content script:", error);
+        resolve(false);
+      }
+    });
+  } catch (error) {
+    console.error("Error checking tab:", error);
+    return false;
+  }
+}
+
+// Safely get data from a tab
+async function getTabData(tabId) {
+  try {
+    // First check if we can access the content script
+    const hasContentScript = await canAccessContentScript(tabId);
+    if (!hasContentScript) {
+      console.log("Content script not available or not responding");
+      return null;
+    }
+    
+    // Now try to get the data
+    return new Promise(resolve => {
+      chrome.tabs.sendMessage(tabId, { action: "getSelection" }, response => {
+        if (chrome.runtime.lastError) {
+          console.log("Error getting selection data:", chrome.runtime.lastError.message);
+          resolve(null);
+          return;
+        }
+        
+        if (response && response.success) {
+          console.log("Got selection data:", response.eventDetails);
+          resolve(response.eventDetails);
+        } else {
+          console.log("Failed to get valid selection data");
+          resolve(null);
+        }
+      });
+      
+      // Timeout for safety
+      setTimeout(() => resolve(null), 1000);
+    });
+  } catch (error) {
+    console.error("Error getting tab data:", error);
+    return null;
+  }
+}
+
+// Try to inject content script and get data
+async function getPageData(tabId) {
+  if (!tabId) {
+    console.log("No valid tab ID provided");
+    return null;
+  }
+  
+  try {
+    // Get tab info to make sure we can inject scripts
+    const tab = await chrome.tabs.get(tabId);
+    
+    // Check if we can inject scripts into this tab
+    if (!tab.url || tab.url.startsWith('chrome:') || tab.url.startsWith('chrome-extension:')) {
+      console.log("Cannot inject scripts into this type of page:", tab.url);
+      return null;
+    }
+    
+    console.log("Attempting to inject content script into tab:", tabId);
+    
+    // Try to inject the content script using the scripting API
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ['src/js/content.js']
+      });
+      console.log("Content script injection successful");
+    } catch (injectionError) {
+      console.error("Content script injection failed:", injectionError);
+      // Continue anyway - the content script might already be loaded
+    }
+    
+    // Wait a moment for the script to initialize if it was just injected
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Now try to get data from the content script
+    return new Promise(resolve => {
+      chrome.tabs.sendMessage(tabId, { action: "getSelection" }, response => {
+        if (chrome.runtime.lastError) {
+          console.log("Error getting page data:", chrome.runtime.lastError.message);
+          resolve(null);
+          return;
+        }
+        
+        if (response && response.success) {
+          console.log("Successfully got page data:", response.eventDetails);
+          resolve(response.eventDetails);
+        } else {
+          console.log("Failed to get page data from content script");
+          resolve(null);
+        }
+      });
+      
+      // Timeout for safety
+      setTimeout(() => {
+        console.log("Timeout waiting for content script response");
+        resolve(null);
+      }, 1000);
+    });
+  } catch (error) {
+    console.error("Error in getPageData:", error);
+    return null;
+  }
+}
+
+// Handle context menu clicks
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === "addToCalendar") {
+    console.log("Context menu clicked on tab:", tab?.id);
+    
+    // Get selection text directly from the info object if available
+    let initialData = {};
+    if (info.selectionText) {
+      initialData.text = info.selectionText;
+      initialData.title = info.selectionText.split('\n')[0];
+    }
+    
+    // Try to get more detailed data from the page
+    const pageData = await getPageData(tab?.id);
+    
+    // Use whatever data we could get
+    openPopup(pageData || initialData);
   }
 });
 
 // Open popup when extension icon is clicked
-chrome.action.onClicked.addListener(tab => {
-  try {
-    chrome.tabs.sendMessage(tab.id, { action: "getSelectedText" }, response => {
-      if (chrome.runtime.lastError) {
-        console.log("Error sending message to content script:", chrome.runtime.lastError.message);
-        // Open popup with just the selected text if available
-        openPopupWithDetails('', {
-          title: tab.title || '',
-          date: '',
-          time: '',
-          location: ''
-        });
-      }
-    });
-  } catch (error) {
-    console.error("Failed to communicate with content script:", error);
-    // Fall back to selection text if available
-    openPopupWithDetails('', {
-      title: tab.title || '',
-      date: '',
-      time: '',
-      location: ''
-    });
-  }
+chrome.action.onClicked.addListener(async (tab) => {
+  console.log("Extension icon clicked on tab:", tab?.id);
+  
+  // Try to get data from the page
+  const pageData = await getPageData(tab?.id);
+  
+  // Open popup with whatever data we could get
+  openPopup(pageData || {});
 });
 
 // Helper function to open popup with event details
-function openPopupWithDetails(selectedText, eventDetails) {
+function openPopup(eventDetails) {
   const width = 380;
   const height = 480; // Default height
 
   // Construct URL for the popup with parameters
-  const popupURL = chrome.runtime.getURL("src/html/popup.html") + 
-    `?text=${encodeURIComponent(selectedText || "")}` + 
-    `&title=${encodeURIComponent(eventDetails.title || "")}` + 
-    `&date=${encodeURIComponent(eventDetails.date || "")}` + 
-    `&time=${encodeURIComponent(eventDetails.time || "")}` + 
-    `&location=${encodeURIComponent(eventDetails.location || "")}`;
+  let popupURL = chrome.runtime.getURL("src/html/popup.html");
+  
+  // Add query parameters if we have event details
+  if (eventDetails) {
+    popupURL += `?text=${encodeURIComponent(eventDetails.text || "")}` + 
+      `&title=${encodeURIComponent(eventDetails.title || "")}` + 
+      `&date=${encodeURIComponent(eventDetails.date || "")}` + 
+      `&time=${encodeURIComponent(eventDetails.time || "")}` + 
+      `&location=${encodeURIComponent(eventDetails.location || "")}`;
+  }
+  
+  console.log("Opening popup with URL:", popupURL);
   
   // Create a popup window
   chrome.windows.create({
@@ -103,86 +222,61 @@ function openPopupWithDetails(selectedText, eventDetails) {
 
 // Listen for messages from content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === "processSelectedText") {
-    // Open popup with extracted details
-    openPopupWithDetails(message.selectedText || '', message.eventDetails || {});
-  }
-  else if (message.action === "addToCalendar") {
-    // Handle adding event to calendar
-    addToGoogleCalendar(message.eventDetails)
-      .then(success => sendResponse({ success }))
-      .catch(error => {
-        console.error('Error adding to calendar:', error);
-        sendResponse({ success: false, error: error.message });
-      });
-    return true; // Indicate async response
+  if (message.action === "addToCalendar") {
+    // Format event details for Google Calendar URL
+    const eventDetails = message.eventDetails;
+    const gcalUrl = createGoogleCalendarUrl(eventDetails);
+    
+    // Open Google Calendar in a new tab
+    chrome.tabs.create({ url: gcalUrl }, (tab) => {
+      console.log('Opened Google Calendar with event details');
+      sendResponse({ success: true });
+    });
+    
+    return true; // Keep the messaging channel open for async response
   }
 });
 
-// Add event to Google Calendar
-async function addToGoogleCalendar(eventDetails) {
-  try {
-    // Format start date/time
-    let startDateTime = eventDetails.date;
+// Create Google Calendar URL with event details
+function createGoogleCalendarUrl(eventDetails) {
+  const baseUrl = 'https://calendar.google.com/calendar/render';
+  const action = 'action=TEMPLATE';
+  
+  // Format title
+  const title = encodeURIComponent(eventDetails.title || '');
+  
+  // Format dates
+  let dates = '';
+  if (eventDetails.date) {
+    const startDate = eventDetails.date.replace(/-/g, ''); // YYYYMMDD format
+    let endDate = startDate;
+    
+    // Add time if provided
     if (eventDetails.time) {
-      startDateTime += `T${eventDetails.time}:00`;
+      const timeNoColon = eventDetails.time.replace(':', '');
+      dates += `T${timeNoColon}00`;
+      endDate = startDate;
+      dates += `/${endDate}T${timeNoColon}00`;
     } else {
-      startDateTime += 'T00:00:00'; // All-day event
+      // All day event
+      dates += `/${endDate}`;
     }
-
-    // Calculate end time (1 hour later or next day for all-day events)
-    let endDateTime;
-    if (eventDetails.time) {
-      const [hours, minutes] = eventDetails.time.split(':');
-      const endTime = new Date();
-      endTime.setHours(parseInt(hours));
-      endTime.setMinutes(parseInt(minutes) + 60);
-      endDateTime = eventDetails.date + 
-        `T${endTime.getHours().toString().padStart(2, '0')}:${endTime.getMinutes().toString().padStart(2, '0')}:00`;
-    } else {
-      // For all-day events, end date is the next day
-      const nextDay = new Date(eventDetails.date);
-      nextDay.setDate(nextDay.getDate() + 1);
-      endDateTime = nextDay.toISOString().split('T')[0] + 'T00:00:00';
-    }
-
-    // Create event object
-    const event = {
-      summary: eventDetails.title,
-      location: eventDetails.location || '',
-      description: eventDetails.description || '',
-      start: {
-        dateTime: startDateTime,
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-      },
-      end: {
-        dateTime: endDateTime,
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-      }
-    };
-
-    // Store event locally (placeholder for actual Google Calendar API integration)
-    const { calendarEvents = [] } = await chrome.storage.sync.get('calendarEvents');
-    calendarEvents.push({
-      ...event,
-      createdAt: new Date().toISOString()
-    });
-    
-    await chrome.storage.sync.set({ calendarEvents });
-    
-    // Show notification
-    chrome.notifications.create({
-      type: 'basic',
-      iconUrl: '/res/icons/icon128.png',
-      title: 'Event Added',
-      message: `"${eventDetails.title}" has been added to your calendar.`
-    });
-    
-    return true;
-  } catch (error) {
-    console.error('Error creating calendar event:', error);
-    throw error;
   }
+  
+  // Format location and description
+  const location = encodeURIComponent(eventDetails.location || '');
+  const description = encodeURIComponent(eventDetails.description || '');
+  
+  // Construct URL
+  const params = [
+    action,
+    `text=${title}`,
+    `dates=${dates}`,
+    `location=${location}`,
+    `details=${description}`
+  ].join('&');
+  
+  return `${baseUrl}?${params}`;
 }
 
 async function fetchSummary(videoUrl, tab) {

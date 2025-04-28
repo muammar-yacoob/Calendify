@@ -10,7 +10,11 @@
     "contextMenus",
     "activeTab",
     "notifications",
-    "tabs"
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
   ],
   "optional_permissions": [
     "identity"
@@ -33,11 +37,12 @@
     }
   },
   "content_scripts": [{
-    "matches": ["*://*/*"],
-    "js": ["src/js/content.js"]
+    "matches": ["http://*/*", "https://*/*", "file://*/*"],
+    "js": ["src/js/content.js"],
+    "run_at": "document_idle"
   }],
   "web_accessible_resources": [{
-    "resources": ["manifest.json", "src/js/utils/*"],
+    "resources": ["manifest.json", "src/js/utils/*", "src/html/popup.html"],
     "matches": ["<all_urls>"]
   }],
   "icons": {

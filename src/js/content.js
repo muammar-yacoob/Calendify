@@ -1,290 +1,231 @@
-console.log('Content script loaded');
+// Calendify Content Script - Simplified
+console.log('Calendify content script loaded');
 
-// Listen for messages from the background script
+// Listen for messages
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === "getSelectedText") {
-    // Get selected text or scan page if none is selected
-    const selectedText = window.getSelection().toString().trim() || '';
-    const eventDetails = extractEventDetailsFromDOM();
-    
-    console.log('Sending extracted details:', eventDetails);
-    
-    // Send extracted details back to background script
-    chrome.runtime.sendMessage({
-      action: "processSelectedText",
-      selectedText: selectedText,
-      eventDetails: eventDetails
-    });
+  if (message.action === "ping") {
+    sendResponse({ success: true });
+  } else if (message.action === "getSelection") {
+    const eventDetails = extractEventData();
+    console.log('Extracted data:', eventDetails);
+    sendResponse({ success: true, eventDetails });
   }
+  return true;
 });
 
-// Extract event details from DOM elements
-function extractEventDetailsFromDOM() {
-  console.log('Extracting event details from DOM');
-  const eventDetails = { title: null, date: null, time: null, location: null };
-  
-  try {
-    // Only check visible, substantial elements
-    const allElements = Array.from(document.querySelectorAll('*')).filter(el => {
-      // Skip hidden elements
-      if (el.offsetParent === null && !['HTML', 'BODY'].includes(el.tagName)) return false;
-      
-      // Skip small elements
-      const rect = el.getBoundingClientRect();
-      if (rect.width < 50 || rect.height < 10) return false;
-      
-      return true;
-    });
-    
-    // First pass: look for obvious event elements with known classes
-    const knownEventClasses = ['event-title', 'event-name', 'event-date', 'event-time', 'event-location'];
-    
-    // Try to find elements with the known classes
-    try {
-      for (const className of knownEventClasses) {
-        // Use try-catch for each query to avoid issues with malformed selectors
-        try {
-          const elements = document.querySelectorAll(`.${className}, [class*="${className}"]`);
-          for (const el of elements) {
-            const text = el.textContent.trim();
-            if (!text) continue;
-            
-            if (className.includes('title') || className.includes('name')) {
-              eventDetails.title = text;
-            } else if (className.includes('date')) {
-              // Extract date using regex if needed
-              const dateMatch = text.match(/\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}/);
-              if (dateMatch) {
-                // Simple conversion to ISO format - can be improved
-                const parts = dateMatch[0].split(/[\/-]/);
-                if (parts.length === 3) {
-                  const year = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
-                  eventDetails.date = `${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-                }
-              }
-            } else if (className.includes('time')) {
-              const timeMatch = text.match(/(\d{1,2}):(\d{2})/);
-              if (timeMatch) {
-                eventDetails.time = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
-              }
-            } else if (className.includes('location')) {
-              eventDetails.location = text;
-            }
-          }
-        } catch (selectorError) {
-          console.log(`Error with selector for class '${className}':`, selectorError);
-          // Continue with next class
-          continue;
-        }
-      }
-    } catch (classSearchError) {
-      console.log('Error searching for elements with specific classes:', classSearchError);
-      // Continue with other extraction methods
-    }
-    
-    // Second pass: look for headings and prominent text for title
-    if (!eventDetails.title) {
-      for (const element of allElements) {
-        if (element.tagName.match(/^H[1-3]$/)) {
-          const text = element.textContent.trim();
-          if (text.length > 5 && text.length < 100 && 
-              !shouldSkipElement(element, text) &&
-              !text.toLowerCase().match(/date|time|location|when|where/i)) {
-            eventDetails.title = text;
-            break;
-          }
-        }
-      }
-    }
-    
-    // Third pass: scan all elements for date/time patterns
-    if (!eventDetails.date || !eventDetails.time) {
-      // Extract date and time with improved regex patterns
-      const dateTimeRegexes = [
-        // Format: "Sun, 2 Nov, 10:00" or similar variants
-        {
-          pattern: /\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun),?\s*(\d{1,2})\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*,?\s*(\d{1,2}):(\d{2})\b/i,
-          handler: (matches) => {
-            const day = parseInt(matches[2], 10).toString().padStart(2, '0');
-            const month = getMonthNumber(matches[3]);
-            const year = new Date().getFullYear();
-            
-            return {
-              date: `${year}-${month}-${day}`,
-              time: `${matches[4].padStart(2, '0')}:${matches[5]}`
-            };
-          }
-        },
-        // Format: "Weekday at 15:00"
-        {
-          pattern: /\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+at\s+(\d{1,2}):(\d{2})\b/i,
-          handler: (matches) => {
-            const dayNames = {
-              'monday': 1, 'tuesday': 2, 'wednesday': 3, 'thursday': 4, 
-              'friday': 5, 'saturday': 6, 'sunday': 0
-            };
-            const today = new Date();
-            const targetDay = dayNames[matches[1].toLowerCase()];
-            const daysToAdd = (targetDay + 7 - today.getDay()) % 7;
-            const targetDate = new Date(today);
-            targetDate.setDate(today.getDate() + daysToAdd);
-            
-            return {
-              date: targetDate.toISOString().split('T')[0],
-              time: `${matches[2].padStart(2, '0')}:${matches[3]}`
-            };
-          }
-        },
-        // Format: "DD Month YYYY"
-        {
-          pattern: /(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{4})/i,
-          handler: (matches) => {
-            const day = matches[1].padStart(2, '0');
-            const month = getMonthNumber(matches[2]);
-            const year = matches[3];
-            
-            return {
-              date: `${year}-${month}-${day}`,
-              time: null
-            };
-          }
-        }
-      ];
-      
-      for (const element of allElements) {
-        const text = element.textContent.trim();
-        if (shouldSkipElement(element, text)) continue;
-        
-        // Try each regex pattern
-        for (const { pattern, handler } of dateTimeRegexes) {
-          const matches = text.match(pattern);
-          if (matches) {
-            const result = handler(matches);
-            // Only override if not already set
-            if (!eventDetails.date && result.date) eventDetails.date = result.date;
-            if (!eventDetails.time && result.time) eventDetails.time = result.time;
-            
-            // If we have both date and time, break the loop
-            if (eventDetails.date && eventDetails.time) break;
-          }
-        }
-        
-        // If we've found date and time, break the loop
-        if (eventDetails.date && eventDetails.time) break;
-      }
-      
-      // Fallback: Look for any time pattern
-      if (!eventDetails.time) {
-        for (const element of allElements) {
-          const text = element.textContent.trim();
-          if (shouldSkipElement(element, text)) continue;
-          
-          const timeMatch = text.match(/(\d{1,2}):(\d{2})/);
-          if (timeMatch) {
-            eventDetails.time = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
-            break;
-          }
-        }
-      }
-    }
-    
-    // Extract location from known patterns or labels
-    if (!eventDetails.location) {
-      const locationKeywords = ['location:', 'venue:', 'where:', 'address:', 'place:'];
-      
-      for (const element of allElements) {
-        const text = element.textContent.trim();
-        if (shouldSkipElement(element, text)) continue;
-        
-        const textLower = text.toLowerCase();
-        
-        // Check if text includes any of the location keywords
-        const matchedKeyword = locationKeywords.find(keyword => textLower.includes(keyword));
-        
-        if (matchedKeyword) {
-          // Get the text after the keyword
-          let locationText = text.split(new RegExp(matchedKeyword, 'i'))[1]?.trim();
-          
-          if (locationText && locationText.length > 0) {
-            eventDetails.location = locationText;
-            break;
-          }
-        } else if (textLower === 'location' || textLower === 'venue' || textLower === 'where') {
-          // If it's just a label, try to get the next element or parent's text
-          const nextEl = element.nextElementSibling;
-          const parentEl = element.parentElement;
-          
-          if (nextEl && nextEl.textContent.trim()) {
-            eventDetails.location = nextEl.textContent.trim();
-            break;
-          } else if (parentEl && parentEl.textContent.includes(textLower)) {
-            // Get parent's text excluding the label
-            const pattern = new RegExp(`${textLower}:?`, 'i');
-            eventDetails.location = parentEl.textContent.replace(pattern, '').trim();
-            break;
-          }
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Error extracting event details:', error);
-  }
-  
-  return eventDetails;
-}
-
-// Helper function to get month number from name
-function getMonthNumber(monthName) {
-  const months = {
-    'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': '05', 'jun': '06',
-    'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'
+// Extract event data using built-in DOM methods
+function extractEventData() {
+  // Basic event details object
+  const data = {
+    title: "",
+    date: "",
+    time: "",
+    location: "",
+    text: window.getSelection().toString().trim()
   };
-  return months[monthName.toLowerCase().substring(0, 3)];
-}
-
-// Helper function to safely get element class name as a string
-function getElementClassNameString(element) {
-  if (!element) return '';
   
-  // Check if className is a string or an object (SVG elements have an object)
-  if (typeof element.className === 'string') {
-    return element.className;
-  } else if (element.className && element.className.baseVal !== undefined) {
-    // SVG elements have className.baseVal
-    return element.className.baseVal;
-  } else if (element.getAttribute) {
-    // Fallback to getAttribute
-    return element.getAttribute('class') || '';
+  // 1. Selected text has priority
+  if (data.text) {
+    console.log('Selected text:', data.text);
+    parseSelectedText(data);
   }
   
-  return '';
+  // 2. Find missing data in the DOM
+  if (!data.title) data.title = findPageTitle();
+  if (!data.date) data.date = findDate();
+  if (!data.time) data.time = findTime();
+  if (!data.location) data.location = findLocation();
+  
+  return data;
 }
 
-// Helper function to determine if an element should be skipped
-function shouldSkipElement(element, text) {
-  // Skip empty text
-  if (!text || text.length === 0) return true;
+// Parse selected text for event details
+function parseSelectedText(data) {
+  const text = data.text;
   
-  // Skip common promotional texts
-  const promoTexts = ['sales end soon', 'promoted', 'sold out', 'free', 'tickets', 'price', 'from £'];
-  if (promoTexts.some(promo => text.toLowerCase().includes(promo))) return true;
+  // Find dates like "Sun, 2 Nov, 10:00"
+  const dateRegex = /\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun),\s*(\d{1,2})\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*,?\s*(\d{1,2}):(\d{2})\b/i;
+  const dateMatch = text.match(dateRegex);
   
-  // Skip elements with certain classes
-  const classNameStr = getElementClassNameString(element);
-  const classNameLower = classNameStr.toLowerCase();
-  const skipClasses = ['urgency', 'promoted', 'price', 'sold', 'ticket', 'sale'];
-  if (skipClasses.some(cls => classNameLower.includes(cls))) return true;
+  if (dateMatch) {
+    const day = dateMatch[1].padStart(2, '0');
+    const month = getMonthNumber(dateMatch[2]);
+    const hour = dateMatch[3].padStart(2, '0');
+    const minute = dateMatch[4];
+    
+    data.date = `${new Date().getFullYear()}-${month}-${day}`;
+    data.time = `${hour}:${minute}`;
+    console.log('Found date & time in selection:', data.date, data.time);
+  }
   
-  // Skip elements that are likely promotional
-  const style = element.getAttribute('style') || '';
-  if (style.includes('darkreader') || style.includes('--Typography')) return true;
-  
-  return false;
+  // Find location
+  const locationMatch = text.match(/(?:location|venue|place|at)[\s:]+([^\n,\.]+)/i);
+  if (locationMatch) {
+    data.location = locationMatch[1].trim();
+    console.log('Found location in selection:', data.location);
+  }
 }
 
-// Extract event details on page load
+// Find the most likely page title
+function findPageTitle() {
+  // Try multiple strategies to find a title
+  const strategies = [
+    // Try structured data
+    () => document.querySelector('[itemprop="name"]')?.textContent.trim(),
+    // Try common heading elements
+    () => document.querySelector('h1')?.textContent.trim(),
+    // Try event-specific classes
+    () => document.querySelector('.event-title, .title, .event-name')?.textContent.trim(),
+    // Fallback to page title
+    () => document.title
+  ];
+  
+  for (const strategy of strategies) {
+    const result = strategy();
+    if (result) {
+      console.log('Found title:', result);
+      return result;
+    }
+  }
+  
+  return document.title;
+}
+
+// Find the most likely date
+function findDate() {
+  // Priority 1: Structured data with datetime attributes
+  const datetimeEl = document.querySelector('[itemprop="startDate"], [datetime], time[datetime]');
+  if (datetimeEl) {
+    const datetimeStr = datetimeEl.getAttribute('datetime') || datetimeEl.getAttribute('content');
+    if (datetimeStr) {
+      try {
+        const dateObj = new Date(datetimeStr);
+        if (!isNaN(dateObj.getTime())) {
+          const date = dateObj.toISOString().split('T')[0];
+          console.log('Found date in structured data:', date);
+          return date;
+        }
+      } catch (e) {}
+    }
+  }
+  
+  // Priority 2: Common date element classes
+  const dateEl = document.querySelector('.date, .event-date, .datetime');
+  if (dateEl && dateEl.textContent.trim()) {
+    const text = dateEl.textContent.trim();
+    
+    // Try to parse formats like DD/MM/YYYY or DD-MM-YYYY
+    const dateMatch = text.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4}|\d{2})/);
+    if (dateMatch) {
+      const day = dateMatch[1].padStart(2, '0');
+      const month = dateMatch[2].padStart(2, '0');
+      const year = dateMatch[3].length === 2 ? `20${dateMatch[3]}` : dateMatch[3];
+      console.log('Found date in element:', `${year}-${month}-${day}`);
+      return `${year}-${month}-${day}`;
+    }
+  }
+  
+  // Priority 3: Look for date patterns in visible text
+  const paragraphs = Array.from(document.querySelectorAll('p, span, div')).filter(el => {
+    // Only consider visible elements with substantial text
+    return el.offsetParent !== null && el.textContent.trim().length > 10;
+  }).map(el => el.textContent.trim());
+  
+  // Look for "Sun, 2 Nov" pattern in paragraphs
+  for (const text of paragraphs) {
+    const dateMatch = text.match(/\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun),\s*(\d{1,2})\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
+    if (dateMatch) {
+      const day = dateMatch[1].padStart(2, '0');
+      const month = getMonthNumber(dateMatch[2]);
+      const year = new Date().getFullYear();
+      console.log('Found date pattern in text:', `${year}-${month}-${day}`);
+      return `${year}-${month}-${day}`;
+    }
+  }
+  
+  return "";
+}
+
+// Find the most likely time
+function findTime() {
+  // Priority 1: Time element with specific class
+  const timeEl = document.querySelector('.time, .event-time');
+  if (timeEl && timeEl.textContent.trim()) {
+    const text = timeEl.textContent.trim();
+    const timeMatch = text.match(/(\d{1,2}):(\d{2})/);
+    if (timeMatch) {
+      const time = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
+      console.log('Found time in element:', time);
+      return time;
+    }
+  }
+  
+  // Priority 2: Look for time patterns in visible text
+  const paragraphs = Array.from(document.querySelectorAll('p, span, div')).filter(el => {
+    return el.offsetParent !== null && el.textContent.trim().length > 5;
+  }).map(el => el.textContent.trim());
+  
+  for (const text of paragraphs) {
+    // Look for HH:MM pattern
+    const timeMatch = text.match(/\b(\d{1,2}):(\d{2})(?:\s*(am|pm))?\b/i);
+    if (timeMatch) {
+      let hour = parseInt(timeMatch[1], 10);
+      const minute = timeMatch[2];
+      const ampm = timeMatch[3]?.toLowerCase();
+      
+      // Convert to 24-hour format if am/pm is specified
+      if (ampm === 'pm' && hour < 12) hour += 12;
+      else if (ampm === 'am' && hour === 12) hour = 0;
+      
+      const time = `${hour.toString().padStart(2, '0')}:${minute}`;
+      console.log('Found time pattern in text:', time);
+      return time;
+    }
+  }
+  
+  return "";
+}
+
+// Find the most likely location
+function findLocation() {
+  // Priority 1: Structured data for location
+  const locationEl = document.querySelector('[itemprop="location"], .location, .venue, .place, .event-location, [itemprop="address"]');
+  if (locationEl && locationEl.textContent.trim()) {
+    const location = locationEl.textContent.trim();
+    console.log('Found location in element:', location);
+    return location;
+  }
+  
+  // Priority 2: Look for location patterns in text
+  const paragraphs = Array.from(document.querySelectorAll('p, span, div')).filter(el => {
+    return el.offsetParent !== null;
+  }).map(el => el.textContent.trim());
+  
+  for (const text of paragraphs) {
+    // Look for "Location: X" or "Venue: X" pattern
+    const locationMatch = text.match(/(?:location|venue|place|at|where)[\s:]+([^\n,\.]+)/i);
+    if (locationMatch) {
+      console.log('Found location pattern in text:', locationMatch[1].trim());
+      return locationMatch[1].trim();
+    }
+  }
+  
+  return "";
+}
+
+// Helper function to convert month name to number (padded to 2 digits)
+function getMonthNumber(monthName) {
+  const months = { 
+    jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+    jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12' 
+  };
+  const key = monthName.substring(0, 3).toLowerCase();
+  return months[key] || '01';
+}
+
+// Extract data when page loads
 setTimeout(() => {
-  const eventDetails = extractEventDetailsFromDOM();
+  const eventDetails = extractEventData();
+  console.log('Initial page data extraction:', eventDetails);
   chrome.storage.local.set({ lastExtractedDetails: eventDetails });
-  console.log('Initial extraction:', eventDetails);
 }, 1000);
