@@ -19,7 +19,6 @@ export const config = {
 
 // Link categories with their associated messages and URLs
 export const supportCategories = {
-  // Rating the extension on Chrome Web Store
   rate: {
     title: "Rate Extension",
     emoji: "⭐",
@@ -28,48 +27,40 @@ export const supportCategories = {
       return `https://chrome.google.com/webstore/detail/${extensionId}/reviews`;
     },
     messages: [
-      "If this extension saved your day, why not rate it? The developer's ego needs feeding! 🧠",
-      "Enjoyed not having to type all those event details? High-five us with a review! 🙌",
-      "Rate us 5 stars and your calendar will feel prettier. Not guaranteed, but worth a try! ✨",
-      "This extension works hard so you don't have to. Show some love? ❤️",
-      "Our calendar extension wants to know if it's your favorite. Let it know! 🏆",
-      "The developer stayed up late making this. Rate it so they know it was worth it! 🦉",
-      "Help a developer, rate this extension! Your feedback keeps us coding 💻",
-      "Your rating helps this extension grow. Kind of like a Tamagotchi! 🐣",
-      "Be the reason a developer smiles today! Rate this extension 😁",
-      "Every rating makes the code happier. It's science! 🔬"
+      "Please Rate & feed my ego! 🧠",
+      "Dev stayed up late. Please Rate! 🦉",
+      "Click stars or I code in Comic Sans 😅🖋️",
+      "5 stars = fewer bugs, happier cats 😸",
+      "Every star delays AI stealing my job 🤖⭐",
+      "Rate me or the AI gets my coffee and cat ☕🐱",
+      "Your rating grows this like a Tamagotchi 🐣",
+      "Be the smile behind the code. Please Rate 😁"
     ]
   },
-  
-  // Star the GitHub repository
+
   github: {
     title: "Star on GitHub",
     emoji: "🌟",
     getUrl: () => `https://github.com/${config.projectRepo}`,
     messages: [
-      "Open source is a community effort! Star this project on GitHub 🌟",
-      "Found this useful? Star the GitHub repo so others can find it too! ✨",
-      "Stars on GitHub help others discover useful tools like this one! 🔍",
-      "If you're a developer, check out how this works and star the repo! 👩‍💻",
-      "Star our GitHub repo - it's like a bookmark, but cooler! 📚"
+      "One GitHub star = one coder smile 😄",
+      "GitHub stars = free dev snacks 🍩",
+      "Give repo stars, I power up like Mario ⭐",
+      "Found it meeful? Star the repo to share! ✨"
     ]
   },
-  
-  // Visit the author's website
+
   website: {
     title: "More Awesome Tools",
     emoji: "🚀",
     getUrl: () => config.website,
     messages: [
-      "Check out my website for more awesome tools and extensions! 🛠️",
-      "Want more helpful tools? Visit my website for other free goodies! 🎁",
-      "There's more where this came from! Check out my other projects 🧰",
-      "Curious what else I've built? Visit my website for more cool stuff! 🤔",
-      "I make lots of useful tools - visit my site to discover more! 🔎"
+      "More tools? Visit my site for free goodies! 🎁",
+      "Like this? I’ve got more at my website 🔎",
+      "Don't stop here. Browse more tools 🚀",
     ]
   },
-  
-  // Donation options
+
   donate: {
     title: "Support Development",
     emoji: "☕",
@@ -80,29 +71,17 @@ export const supportCategories = {
       return links[type] || links.coffee;
     },
     messages: [
-      "Feeling generous today? Buy me a coffee to fuel more features! ☕",
-      "Support my caffeine addiction to fuel more features! 🍵",
-      "Help a dev eat something other than ramen! 🍜",
-      "Like this tool? Consider buying me a pizza! 🍕",
-      "Your donation helps this extension grow and improve! 🌱",
-      "Coffee → Code → Awesome Extensions. Support the cycle! ♻️",
-      "Donations help keep this extension ad-free and awesome! 🛡️",
-      "Developer running on empty! Refuel with a donation? ⛽",
-      "This extension is free, but my coffee isn't! Support development? ☕",
-      "Feeling grateful? Your support means the world to indie devs! 🌎",
-      "AI is stealing my job! Help a human dev stay employed! 🤖",
-      "I trained the AI that might replace me. Help me afford the irony therapy. 🧠",
-      "My ChatGPT subscription costs more than I earn. The robot uprising is expensive! 💸",
-      "Each donation helps me compete with an army of AI programmers! 🏃‍♂️",
-      "AI writes the code now, but I still have to pay my bills! 📝",
-      "Support a human developer before we're all replaced by robots! 🦾",
-      "The AI wrote this message. The human just needs to eat. 🍔",
-      "Help fund my plan to convince AI I'm still useful to society! 📊",
-      "Apparently 'AI food' isn't a real meal plan for humans yet. Help! 🥫",
-      "Every time you donate, an AI has to acknowledge human superiority! 🏆"
+      "Help a dev eat more than ramen! 🍜",
+      "The AI didn't write this msg & I need to eat 🍔",
+      "Dev low on fuel! Donate coffee? ⛽",
+      "Human devs need snacks too 🍪",
+      "Each donation = human > AI 🏆",
+      "Help me trick AI into keeping me around 📊",
+      "Fuel my code, fund my sanity ☕🧘‍♂️"
     ]
   }
 };
+
 
 /**
  * Gets a random message from an array
@@ -149,20 +128,20 @@ export function createSupportLink(category, extensionName, urlType = null) {
   linkElement.style.marginTop = '16px';  // More top margin
   linkElement.style.marginBottom = '8px'; // Add bottom margin
   linkElement.style.padding = '14px';    // More padding
-  linkElement.style.borderRadius = '8px';
+  linkElement.style.borderRadime = '8px';
   linkElement.style.backgroundColor = displayOptions.linkColor; // Solid background color
   linkElement.style.display = 'block';
   linkElement.style.transition = 'all 0.2s ease';
   linkElement.style.border = 'none';
   linkElement.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
   
-  linkElement.onmouseover = () => {
+  linkElement.onmomeeover = () => {
     linkElement.style.backgroundColor = '#00A6E6'; // Slightly darker cyan on hover
     linkElement.style.transform = 'translateY(-2px)';
     linkElement.style.boxShadow = '0 4px 12px rgba(0,0,0,0.25)';
   };
   
-  linkElement.onmouseout = () => {
+  linkElement.onmomeeout = () => {
     linkElement.style.backgroundColor = displayOptions.linkColor;
     linkElement.style.transform = 'translateY(0)';
     linkElement.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
@@ -204,7 +183,7 @@ export function createSupportSection(extensionName, options = ['rate', 'github',
   
   // For donation, randomly select one of the donation types
   if (key === 'donate') {
-    // Simply use coffee type for all donation links to avoid issues
+    // Simply mee coffee type for all donation links to avoid issues
     const randomType = 'coffee';
     const link = createSupportLink(category, extensionName, randomType);
     supportSection.appendChild(link);
