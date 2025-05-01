@@ -143,8 +143,8 @@ chrome.action.onClicked.addListener(async (tab) => {
 
 // Helper function to open popup with event details
 function openPopup(eventDetails) {
-  const width = 320;  // Adjusted width to provide proper spacing
-  const height = 410; // Increased dimensions to prevent squashing
+  const width = 390;  // Adjusted width to provide proper spacing
+  const height = 400; // Increased dimensions to prevent squashing
 
   // Construct URL for the popup with parameters
   let popupURL = chrome.runtime.getURL("src/html/popup.html");

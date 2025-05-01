@@ -46,7 +46,7 @@ export const supportCategories = {
       "One GitHub star = one coder smile 😄",
       "GitHub stars = free dev snacks 🍩",
       "Give repo stars, I power up like Mario ⭐",
-      "Found it meeful? Star the repo to share! ✨"
+      "Found it useful? Star the repo to share! ✨"
     ]
   },
 
