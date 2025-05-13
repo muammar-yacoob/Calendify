@@ -1,10 +1,10 @@
 [//]: # (Constants)
 [store-link]: https://chrome.google.com/webstore/detail/calendify/jphgemnlnggiimgclghleogeiigpchji
-[privacy-link]: https://github.com/muammar-yacoob/calendify/blob/main/PRIVACY.md
+[privacy-link]: ./PRIVACY.md
 [coffee-link]: https://buymeacoffee.com/spark88
 [git-repo]: https://github.com/muammar-yacoob/calendify.git
-[fork-link]: https://github.com/muammar-yacoob/calendify/fork
-[issues-link]: https://github.com/muammar-yacoob/calendify/issues
+[fork-link]:  ../../fork
+[issues-link]: ../../issues
 
 <div align="center">
 <img src=res/images/meme.png width="250" style="border-radius: 15px;" alt="Calendify Meme">
