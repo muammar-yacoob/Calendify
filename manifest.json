@@ -4,7 +4,7 @@
   "version": "1.1.0",
   "author": "Spark Apps",
   "description": "Easily add dates and events from web pages to your Google Calendar.",
-  "homepage_url": "https://spark-apps.co/apps/calendify",
+  "homepage_url": "https://spark-apps.co",
   "permissions": [
     "contextMenus",
     "activeTab",

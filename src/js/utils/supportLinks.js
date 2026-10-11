@@ -13,7 +13,7 @@ export const config = {
   projectRepo: "muammar-yacoob/calendify",
   // Apps and developer tooling live on spark-apps.co; spark-games.co.uk keeps
   // the games and the Unity back-catalogue. Calendify is listed on the former.
-  website: "https://spark-apps.co/apps/calendify",
+  website: "https://spark-apps.co",
   
   // Your donation details
   buyMeCoffeeUsername: "spark88",
