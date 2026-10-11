@@ -1,322 +1,232 @@
-document.addEventListener('DOMContentLoaded', async () => {
-  console.log('Popup loaded');
-  
-  // Get parameters from URL and prefill form
-  const urlParams = new URLSearchParams(window.location.search);
-  const prefilled = {
-    text: urlParams.get('text') || '',
-    title: urlParams.get('title') || '',
-    date: urlParams.get('date') || '',
-    time: urlParams.get('time') || '',
-    location: urlParams.get('location') || '',
-    meetingLink: urlParams.get('meetingLink') || '',
-    description: urlParams.get('description') || ''
-  };
-  
-  // Get form elements
-  const eventTitleEl = document.getElementById('eventTitle');
-  const eventDateEl = document.getElementById('eventDate');
-  const eventTimeEl = document.getElementById('eventTime');
-  const eventLocationEl = document.getElementById('eventLocation');
-  const eventDescriptionEl = document.getElementById('eventDescription');
-  const addButtonEl = document.getElementById('addButton');
-  
-  // Set form fields
-  eventTitleEl.value = prefilled.title;
-  eventDateEl.value = prefilled.date;
-  eventTimeEl.value = prefilled.time;
-  
-  // Handle location and meeting link
-  if (prefilled.location) {
-    eventLocationEl.value = prefilled.location;
-  } else if (prefilled.meetingLink) {
-    eventLocationEl.value = `Online Event | ${prefilled.meetingLink}`;
-  }
-  
-  // Handle description and include meeting link if available
-  let description = prefilled.description || prefilled.text || '';
-  
-  // If we have a meeting link and it's not already in the description
-  if (prefilled.meetingLink && !description.includes(prefilled.meetingLink)) {
-    if (description) description += '\n\n';
-    description += `Meeting Link: ${prefilled.meetingLink}`;
-  }
-  
-  eventDescriptionEl.value = description;
-  const meetingLinkValue = prefilled.meetingLink || '';
-  
-  // Process text for missing fields if needed
-  if (prefilled.text && (!prefilled.title || !prefilled.date || !prefilled.time || !prefilled.location)) {
-    const extractedDetails = parseEventDetails(prefilled.text);
-    
-    // Only use parsed values for empty fields
-    if (!prefilled.title && extractedDetails.title) eventTitleEl.value = extractedDetails.title;
-    if (!prefilled.date && extractedDetails.date) eventDateEl.value = extractedDetails.date;
-    if (!prefilled.time && extractedDetails.time) eventTimeEl.value = extractedDetails.time;
-    if (!eventLocationEl.value && extractedDetails.location) eventLocationEl.value = extractedDetails.location;
-    if (!eventLocationEl.value && isLikelyOnlineEvent(prefilled.text)) eventLocationEl.value = "Online Event";
-  }
-  
-  // Validate form and update button state
-  function validateForm() {
-    const isValid = eventTitleEl.value.trim() !== '' && eventDateEl.value.trim() !== '';
-    addButtonEl.disabled = !isValid;
-    addButtonEl.style.opacity = isValid ? '1' : '0.5';
-    addButtonEl.style.cursor = isValid ? 'pointer' : 'not-allowed';
-    return isValid;
-  }
-  
-  // Add listeners and perform initial validation
-  eventTitleEl.addEventListener('input', validateForm);
-  eventDateEl.addEventListener('input', validateForm);
-  validateForm();
-  
-  // Handle add to calendar button click
-  addButtonEl.addEventListener('click', () => {
-    if (!validateForm()) {
-      showNotification('Title and date are required', 'error');
-      return;
-    }
-    
-    const eventDetails = {
-      title: eventTitleEl.value,
-      date: eventDateEl.value,
-      time: eventTimeEl.value,
-      location: eventLocationEl.value,
-      description: eventDescriptionEl.value,
-      meetingLink: meetingLinkValue
-    };
+/* The popup: a form, and a model that is invited to fill in its blanks.
+ *
+ * The AI is never in the way. Every field is editable, Add is gated on title
+ * and date and on nothing else, and if there is no key and no built-in model
+ * the form still opens prefilled from the page's own markup. That is the whole
+ * degradation story: the extension that worked before this change still works
+ * exactly as well with the model switched off.
+ *
+ * This file used to carry its own copy of parseEventDetails, getMonthNumber
+ * and isLikelyOnlineEvent, duplicating content.js line for line. Both copies
+ * are gone: the worker reads the page and the model reads the prose.
+ */
 
-    chrome.runtime.sendMessage({
-      action: "addToCalendar",
-      eventDetails: eventDetails
-    }, (response) => {
-      if (response && response.success) {
-        showNotification('Event added to calendar!');
-        setTimeout(() => window.close(), 1500);
-      } else {
-        showNotification('Failed to add event to calendar', 'error');
-      }
-    });
+/* $ and the lastError-swallowing send(), copied from
+   minutely/src/shared/utils.mjs:107-120. The swallow is not laziness: the
+   service worker may be asleep or mid-restart, in which case sendMessage
+   rejects with "Could not establish connection". That is a normal state. */
+const $ = (id) => document.getElementById(id);
+
+function send(message) {
+  return new Promise((resolve) => {
+    try {
+      chrome.runtime.sendMessage(message, (reply) => {
+        void chrome.runtime.lastError;
+        resolve(reply);
+      });
+    } catch {
+      resolve(undefined);
+    }
   });
-  
-  // Add compact support section
-  loadCompactSupportLinks();
+}
+
+const KEY_STORAGE = 'geminiApiKey';   // the kit's own key, shared with his other extensions
+const GEMINI_ORIGIN = 'https://generativelanguage.googleapis.com/*';
+
+const FIELDS = {
+  title: 'eventTitle',
+  date: 'eventDate',
+  time: 'eventTime',
+  location: 'eventLocation',
+  description: 'eventDescription'
+};
+
+let windowId = null;
+let meetingLink = '';
+
+function notice(message, kind = 'is-warn') {
+  const el = $('notice');
+  el.textContent = message || '';
+  el.className = `cal-notice ${kind}`;
+  el.hidden = !message;
+}
+
+/* Blanks only, which is the single rule that covers both cases worth
+   protecting: a field the page already filled from its own markup is a fact
+   and outranks the model, and a field the user has typed into is their
+   decision. Neither is ever overwritten, so no dirty-tracking is needed. */
+function fill(values) {
+  for (const [key, id] of Object.entries(FIELDS)) {
+    const el = $(id);
+    if (el && !el.value && values[key]) el.value = values[key];
+  }
+  if (!meetingLink && values.meetingLink) meetingLink = values.meetingLink;
+  validateForm();
+}
+
+function validateForm() {
+  const valid = $('eventTitle').value.trim() !== '' && $('eventDate').value.trim() !== '';
+  $('addButton').disabled = !valid;
+  return valid;
+}
+
+// ── engine ──────────────────────────────────────────────────────────────────
+
+/* Copied from minutely/src/panel/settings.mjs:36-108, reworded for a web page
+   rather than a meeting, and with the pill dropped. */
+const HINTS = {
+  cloud: 'Using your Gemini API key. Long pages go in one pass.',
+  available: 'Reading happens on this computer. No key, no account, nothing uploaded.',
+  downloadable: 'Chrome can read pages here, but has to fetch the model first. A few gigabytes, once.',
+  downloading: 'Downloading the built-in model.',
+  unsupported: 'This computer cannot run Chrome\'s built-in model. Add a key below, or just fill the form in.'
+};
+
+async function refreshEngine() {
+  const reply = await send({ type: 'ENGINE_STATUS' });
+  const status = reply?.status || {};
+  const cloud = status.engine === 'cloud';
+  const state = status.state || 'unsupported';
+
+  $('engineHint').textContent = cloud ? HINTS.cloud : (HINTS[state] || HINTS.unsupported);
+  $('enableNano').hidden = !(!cloud && state === 'downloadable');
+
+  // Opened only when there is genuinely nothing that can read a page.
+  if (!cloud && state === 'unsupported') $('keyDetails').open = true;
+  return { cloud, state };
+}
+
+$('enableNano').addEventListener('click', async () => {
+  $('enableNano').disabled = true;
+  $('downloadBar').hidden = false;
+  const result = await send({ type: 'ENGINE_ENABLE' });
+  $('downloadBar').hidden = true;
+  $('enableNano').disabled = false;
+  if (result && !result.ok) $('engineHint').textContent = result.message || 'Could not enable the built-in model.';
+  refreshEngine();
 });
 
-// Show notification message
-function showNotification(message, type = 'success') {
-  const notificationEl = document.getElementById('notification');
-  notificationEl.textContent = message;
-  notificationEl.className = `notification ${type}`;
-  notificationEl.style.display = 'block';
-  
-  setTimeout(() => {
-    notificationEl.style.display = 'none';
-  }, 3000);
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type === 'ENGINE_DOWNLOAD_PROGRESS') {
+    $('downloadBar').hidden = false;
+    $('downloadBar').value = message.loaded || 0;
+  }
+});
+
+// ── api key ─────────────────────────────────────────────────────────────────
+
+$('saveKey').addEventListener('click', async () => {
+  const value = $('apiKey').value.trim();
+  if (!value) return;
+
+  /* The host permission is OPTIONAL in the manifest and asked for here, on a
+     real user gesture, rather than declared up front.
+     Declaring it would have been a permission increase on an extension that
+     already has users: Chrome disables an extension whose update adds a host
+     warning until each user re-approves it, so every existing install would
+     have gone dark on update. Asking at the moment somebody opts into the
+     cloud model costs one prompt and breaks nobody. */
+  const granted = await chrome.permissions.request({ origins: [GEMINI_ORIGIN] }).catch(() => false);
+  if (!granted) {
+    notice('Calendify needs permission to reach Google\'s Gemini API before a key can be used.', 'is-bad');
+    return;
+  }
+
+  await chrome.storage.local.set({ [KEY_STORAGE]: value });
+  $('apiKey').value = '';
+  // Never re-displayed, only acknowledged.
+  $('apiKey').placeholder = 'Saved';
+  notice('');
+  refreshEngine();
+});
+
+$('clearKey').addEventListener('click', async () => {
+  await chrome.storage.local.remove(KEY_STORAGE);
+  $('apiKey').value = '';
+  $('apiKey').placeholder = 'AIza…';
+  refreshEngine();
+});
+
+// ── the event ───────────────────────────────────────────────────────────────
+
+$('addButton').addEventListener('click', async () => {
+  if (!validateForm()) {
+    notice('A title and a date are required.', 'is-bad');
+    return;
+  }
+  const reply = await send({
+    type: 'ADD_TO_CALENDAR',
+    event: {
+      title: $('eventTitle').value,
+      date: $('eventDate').value,
+      time: $('eventTime').value,
+      location: $('eventLocation').value,
+      description: $('eventDescription').value,
+      meetingLink,
+      certainty: $('eventDate').dataset.certainty || 'stated'
+    }
+  });
+  if (reply?.ok) window.close();
+  else notice(reply?.message || 'Could not open Google Calendar.', 'is-bad');
+});
+
+for (const id of ['eventTitle', 'eventDate']) {
+  $(id).addEventListener('input', validateForm);
 }
 
-// Function to load support links in a more compact way
-async function loadCompactSupportLinks() {
+// ── start ───────────────────────────────────────────────────────────────────
+
+(async function start() {
+  const win = await chrome.windows.getCurrent();
+  windowId = win.id;
+
+  const pending = await send({ type: 'PENDING', windowId });
+  fill(pending?.form || {});
+
+  const { cloud, state } = await refreshEngine();
+
+  /* The model is asked ONLY when the page's own markup left the two fields that
+     matter empty, and never otherwise.
+     Two reasons, and the privacy one is the important one: a toolbar click
+     carries no selection, so an ungated extract would upload a slice of
+     whatever page is open, including a private inbox, every single time the
+     icon is pressed. This keeps "nothing leaves until you ask for an event"
+     literally true, and it does not spend the user's own cloud quota
+     re-reading a page that already said what it was. */
+  const needsHelp = !$('eventTitle').value || !$('eventDate').value;
+  if (!needsHelp || !pending?.hasAi) return;
+  if (!cloud && state !== 'available') return;   // nothing that could answer
+
+  notice('Reading the page…', 'is-warn');
+  const result = await send({ type: 'EXTRACT', windowId });
+
+  if (result?.ok) {
+    notice('');
+    fill(result.event);
+    if (result.event.certainty && result.event.certainty !== 'stated') {
+      $('eventDate').dataset.certainty = result.event.certainty;
+      notice('Calendify read this date off the page rather than being told it. Please check it.', 'is-warn');
+    }
+  } else {
+    // The form is untouched and still perfectly usable.
+    notice(result?.message || 'Could not read the page. Fill the form in yourself.', 'is-bad');
+  }
+})();
+
+// ── support strip ───────────────────────────────────────────────────────────
+
+(async function loadSupportLinks() {
   try {
-    let supportLinksModule;
-    try {
-      supportLinksModule = await import('./utils/supportLinks.js');
-    } catch (e) {
-      try {
-        supportLinksModule = await import('../js/utils/supportLinks.js');
-      } catch (e2) {
-        const modulePath = chrome.runtime.getURL('src/js/utils/supportLinks.js');
-        supportLinksModule = await import(modulePath);
-      }
-    }
-    
-    if (!supportLinksModule) return;
-    
-    const manifest = await (await fetch(chrome.runtime.getURL('manifest.json'))).json();
-    const extensionName = manifest.name || 'Calendify';
-    
-    // Get the support elements from the HTML
-    const supportText = document.getElementById('supportText');
-    const supportButton = document.getElementById('supportButton');
-    
-    if (!supportText || !supportButton) {
-      console.error('Support elements not found');
-      return;
-    }
-    
-    // Get a random category
-    const options = ['rate', 'github', 'website', 'donate'];
-    const randomCategoryInfo = supportLinksModule.getRandomCategory(options);
-    if (!randomCategoryInfo) return;
-    
-    const { category } = randomCategoryInfo;
-    
-    // Set text content - will wrap automatically based on CSS
-    let message = supportLinksModule.getRandomMessage(category.messages);
-    supportText.textContent = message;
-    
-    // Set button properties
-    supportButton.textContent = `${category.title} ${category.emoji}`;
-    supportButton.href = category.getUrl();
-    supportButton.target = '_blank';
-    supportButton.rel = 'noopener noreferrer';
+    const links = await import('./utils/supportLinks.js');
+    const picked = links.getRandomCategory(['rate', 'github', 'website', 'donate']);
+    if (!picked) return;
+    const { category } = picked;
+    $('supportText').textContent = links.getRandomMessage(category.messages);
+    $('supportButton').textContent = `${category.title} ${category.emoji}`;
+    $('supportButton').href = category.getUrl();
+    $('supportButton').rel = 'noopener noreferrer';
   } catch (error) {
-    console.error('Error loading support utilities:', error);
-    
-    // Add a simple fallback if there's an error
-    const supportText = document.getElementById('supportText');
-    if (supportText) {
-      supportText.textContent = 'Thanks for using Calendify! ⭐';
-    }
+    console.error('Calendify: support links unavailable', error);
+    $('supportText').textContent = 'Thanks for using Calendify! ⭐';
   }
-}
-
-// Parse event details from text
-function parseEventDetails(text) {
-  const eventDetails = { title: null, date: null, time: null, location: null };
-  
-  // Extract title (first substantial line)
-  const lines = text.split('\n').filter(line => line.trim().length > 0);
-  for (const line of lines) {
-    // Look for substantial text that isn't just metadata or timestamps
-    if (line.length > 5 && line.length < 100 && 
-        !line.toLowerCase().match(/date|time|location|when|where/i) && 
-        !line.match(/^\d{1,2}:\d{2}$/) &&
-        !line.match(/^(mon|tue|wed|thu|fri|sat|sun)/i)) {
-      eventDetails.title = line.trim();
-      break;
-    }
-  }
-  
-  // Extract date and time with improved regex patterns
-  const dateTimeRegexes = [
-    // Format: "Sun, 2 Nov, 10:00" or similar variants
-    {
-      pattern: /\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun),?\s*(\d{1,2})\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*,?\s*(\d{1,2}):(\d{2})\b/i,
-      handler: (matches) => {
-        const day = parseInt(matches[2], 10).toString().padStart(2, '0');
-        const month = getMonthNumber(matches[3]);
-        const year = new Date().getFullYear();
-        
-        return {
-          date: `${year}-${month}-${day}`,
-          time: `${matches[4].padStart(2, '0')}:${matches[5]}`
-        };
-      }
-    },
-    // Format: "Weekday at 15:00"
-    {
-      pattern: /\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+at\s+(\d{1,2}):(\d{2})\b/i,
-      handler: (matches) => {
-        const dayNames = {
-          'monday': 1, 'tuesday': 2, 'wednesday': 3, 'thursday': 4, 
-          'friday': 5, 'saturday': 6, 'sunday': 0
-        };
-        const today = new Date();
-        const targetDay = dayNames[matches[1].toLowerCase()];
-        const daysToAdd = (targetDay + 7 - today.getDay()) % 7;
-        const targetDate = new Date(today);
-        targetDate.setDate(today.getDate() + daysToAdd);
-        
-        return {
-          date: targetDate.toISOString().split('T')[0],
-          time: `${matches[2].padStart(2, '0')}:${matches[3]}`
-        };
-      }
-    },
-    // Format: "DD Month YYYY"
-    {
-      pattern: /(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{4})/i,
-      handler: (matches) => {
-        const day = matches[1].padStart(2, '0');
-        const month = getMonthNumber(matches[2]);
-        const year = matches[3];
-        
-        return {
-          date: `${year}-${month}-${day}`,
-          time: null
-        };
-      }
-    }
-  ];
-  
-  // Try each regex pattern
-  for (const { pattern, handler } of dateTimeRegexes) {
-    const matches = text.match(pattern);
-    if (matches) {
-      const result = handler(matches);
-      if (result.date) eventDetails.date = result.date;
-      if (result.time) eventDetails.time = result.time;
-      
-      // If we have both date and time, break the loop
-      if (eventDetails.date && eventDetails.time) break;
-    }
-  }
-  
-  // If no time found yet but there's a time in the text
-  if (!eventDetails.time) {
-    const timeMatch = text.match(/(\d{1,2}):(\d{2})/);
-    if (timeMatch) {
-      eventDetails.time = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
-    }
-  }
-  
-  // Extract location
-  const locationKeywords = ['location:', 'venue:', 'where:', 'address:', 'place:'];
-  
-  // Check if text includes any of the location keywords
-  for (const keyword of locationKeywords) {
-    if (text.toLowerCase().includes(keyword)) {
-      const parts = text.split(new RegExp(keyword, 'i'));
-      if (parts.length > 1) {
-        // Get the text after the keyword until the next newline
-        const locationText = parts[1].split('\n')[0].trim();
-        if (locationText) {
-          eventDetails.location = locationText;
-          break;
-        }
-      }
-    }
-  }
-  
-  return eventDetails;
-}
-
-// Helper function to get month number from name
-function getMonthNumber(monthName) {
-  const months = {
-    'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': '05', 'jun': '06',
-    'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'
-  };
-  return months[monthName.toLowerCase().substring(0, 3)];
-}
-
-// Check if text suggests this is an online event
-function isLikelyOnlineEvent(text) {
-  if (!text) return false;
-  
-  const lowerText = text.toLowerCase();
-  const onlineKeywords = [
-    'online event', 'virtual event', 'webinar', 
-    'zoom', 'teams', 'google meet', 'webex',
-    'join online', 'virtual', 'web conference',
-    'online session', 'online workshop'
-  ];
-  
-  for (const keyword of onlineKeywords) {
-    if (lowerText.includes(keyword)) {
-      console.log('Text suggests online event:', keyword);
-      return true;
-    }
-  }
-  
-  // Check for meeting links in the text
-  const meetingLinkRegex = /(?:zoom\.us|teams\.microsoft\.com|meet\.google\.com|webex\.com)/i;
-  if (meetingLinkRegex.test(lowerText)) {
-    console.log('Text contains meeting link');
-    return true;
-  }
-  
-  return false;
-}
+})();

@@ -8,10 +8,12 @@ export const displayOptions = {
 
 export const config = {
   // Your personal/project details
-  author: "Spark Games",
+  author: "Spark Apps",
   projectName: "Calendify",
   projectRepo: "muammar-yacoob/calendify",
-  website: "https://spark-games.co.uk",    
+  // Apps and developer tooling live on spark-apps.co; spark-games.co.uk keeps
+  // the games and the Unity back-catalogue. Calendify is listed on the former.
+  website: "https://spark-apps.co/apps/calendify",
   
   // Your donation details
   buyMeCoffeeUsername: "spark88",

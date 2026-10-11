@@ -1,5 +1,5 @@
 [//]: # (Constants)
-[store-link]: https://chrome.google.com/webstore/detail/calendify/jphgemnlnggiimgclghleogeiigpchji
+[store-link]: https://chromewebstore.google.com/detail/calendify/jphgemnlnggiimgclghleogeiigpchji
 [privacy-link]: ./PRIVACY.md
 [coffee-link]: https://buymeacoffee.com/spark88
 [git-repo]: https://github.com/muammar-yacoob/calendify.git
@@ -23,6 +23,11 @@ Calendify is a Chrome extention that automatically detects event details on webp
 Install from [Chrome Web Store][store-link] & 
 Watch the [demo video](https://youtube.com/shorts/DnWywDT0na8)
 
+
+## 🧪 Tests
+```sh
+node test/extract.test.mjs
+```
 
 ## 🌱 Contributions
 Star the repo ⭐ & I power up like Mario 🍄<br>

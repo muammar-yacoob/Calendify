@@ -1,108 +1,214 @@
-.header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
+/* Calendify's popup.
+ *
+ * Two halves. The first is Calendify's own form, moved here verbatim out of the
+ * 160-line inline <style> that used to sit in popup.html. The second is the
+ * engine row, the notice and the API-key disclosure, copied from
+ * minutely/src/styles/{shell,settings}.css and re-scoped mly- -> cal-, with
+ * Minutely's green accent swapped for the blue this popup already used.
+ *
+ * The old src/styles/base.css that this replaces was orphaned: nothing ever
+ * linked it, it hardcoded a 350px body and a different palette, and it was a
+ * stale fork of TextPert's. src/styles/styles.css was zero bytes.
+ */
+
+:root {
+  --bg-color: #202124;
+  --text-color: #e8eaed;
+  --input-bg: #303134;
+  --border-color: #5f6368;
+  --accent-color: #8ab4f8;
+  --accent-hover: #aecbfa;
+
+  /* Added for the engine row and the notice. */
+  --muted: #9aa0a6;
+  --good: #81c995;
+  --warn: #fdd663;
+  --bad: #f28b82;
+
+  --spacing-xs: 2px;
+  --spacing-sm: 4px;
+  --spacing-md: 8px;
+  --spacing-lg: 12px;
+  --border-radius: 6px;
+  --font-size-xs: 10px;
+  --font-size-sm: 11px;
+  --font-size-md: 12px;
+  --font-size-lg: 14px;
 }
 
-.header-icon {
-  width: 32px;
-  height: 32px;
-}
-
-.header-text {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.header-text h1 {
-  margin: 0;
-  padding: 0;
-  border: none;
-  font-size: 18px;
-  line-height: 1;
-}
-
-.version-tag {
-  color: #909296;
-  font-size: 11px;
-  line-height: 1;
-}
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  width: 350px;
-  margin: 0;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #1a1b1e;
-  color: #e4e4e4;
-  font-size: 13px;
-}
-
-.container {
-  padding: 12px;
-}
-
-h1 {
-  font-size: 16px;
-  color: #ffffff;
-  margin: 0 0 12px 0;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #2d2e32;
-}
-
-/* Form elements */
-input, button, select {
-  font-family: inherit;
-  box-sizing: border-box;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-size: var(--font-size-md);
+  padding: var(--spacing-md);
   width: 100%;
-  padding: 8px;
-  margin-bottom: 12px;
-  background-color: #25262b;
-  color: #e4e4e4;
-  border: 1px solid #2d2e32;
-  border-radius: 4px;
+  /* Not overflow:hidden, which is what clipped everything below the form in a
+     window that cannot scroll. */
+  display: flex;
+  flex-direction: column;
 }
 
-select {
-  appearance: none;
-  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23e4e4e4%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px top 50%;
-  background-size: 12px auto;
-  padding-right: 32px;
+/* ── The form ───────────────────────────────────────────────────────────── */
+
+.container { display: flex; flex-direction: column; width: 100%; gap: var(--spacing-sm); }
+
+.form-row { width: 100%; margin-bottom: var(--spacing-md); }
+.form-row.flex { display: flex; gap: var(--spacing-sm); }
+.form-col { flex: 1; }
+
+label { display: block; font-size: var(--font-size-sm); margin-bottom: var(--spacing-xs); font-weight: bold; }
+
+input, textarea {
+  width: 100%;
+  padding: var(--spacing-xs) var(--spacing-md);
+  background-color: var(--input-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  font: inherit;
+  font-size: var(--font-size-md);
+  margin-bottom: var(--spacing-sm);
 }
 
-input:focus, select:focus {
-  outline: none;
-  border-color: #64b5f6;
-}
+textarea { height: 55px; resize: none; }
+input:focus, textarea:focus { border-color: var(--accent-color); outline: none; }
 
-button {
-  background-color: #64b5f6;
+#addButton {
+  width: 100%;
+  padding: var(--spacing-sm);
+  background-color: var(--accent-color);
+  color: var(--bg-color);
   border: none;
+  border-radius: var(--border-radius);
+  font: inherit;
+  font-weight: bold;
   cursor: pointer;
-  font-weight: 500;
+  transition: all 0.2s ease;
+  margin-top: 6px;
+  margin-bottom: var(--spacing-lg);
+}
+
+#addButton:hover { background-color: var(--accent-hover); box-shadow: 0 2px 6px rgba(138, 180, 248, 0.4); }
+#addButton:disabled { background-color: var(--border-color); opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+
+/* ── Support strip ──────────────────────────────────────────────────────── */
+
+#supportContainer { width: 100%; padding-top: var(--spacing-md); margin-top: var(--spacing-md); border-top: 1px solid var(--border-color); }
+
+.support-flex { display: flex; flex-wrap: wrap; align-items: center; gap: var(--spacing-md); width: 100%; }
+.support-text { font-size: var(--font-size-xs); flex: 1; min-width: 150px; overflow-wrap: break-word; line-height: 1.3; }
+
+.support-button {
+  background-color: var(--accent-color);
+  color: var(--bg-color);
+  border: none;
+  border-radius: var(--border-radius);
+  padding: var(--spacing-xs) var(--spacing-md);
+  font-size: var(--font-size-xs);
+  font-weight: bold;
+  text-decoration: none;
+  white-space: nowrap;
   transition: all 0.2s ease;
 }
 
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.support-button:hover { background-color: var(--accent-hover); transform: translateY(-1px); }
+
+/* ── Notice ─────────────────────────────── minutely/shell.css:244-263 ──── */
+
+/* Replaces the old .notification, which had opacity:0 and no rule anywhere
+   that added the class which would have made it visible. It had never once
+   been seen by a user. */
+.cal-notice {
+  padding: var(--spacing-md) 11px;
+  margin-bottom: var(--spacing-lg);
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
 }
 
-button:not(:disabled):hover {
-  background-color: #5294e2;
+.cal-notice.is-good { border-color: rgba(129, 201, 149, 0.3); background: rgba(129, 201, 149, 0.07); }
+.cal-notice.is-warn { border-color: rgba(253, 214, 99, 0.32); background: rgba(253, 214, 99, 0.07); }
+.cal-notice.is-bad  { border-color: rgba(242, 139, 130, 0.3); background: rgba(242, 139, 130, 0.07); }
+
+/* ── Engine row ────────────────────── minutely/settings.css:199-240 ────── */
+
+.cal-engine { display: flex; align-items: center; gap: var(--spacing-md); flex-wrap: wrap; margin-top: var(--spacing-sm); }
+
+.cal-btn {
+  padding: 5px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: var(--input-bg);
+  color: var(--text-color);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease, transform 0.14s ease;
 }
 
-/* Setting groups */
-.setting-group {
-  margin-bottom: 16px;
+.cal-btn:hover { background: #3a3b3f; border-color: rgba(255, 255, 255, 0.18); transform: translateY(-1px); }
+.cal-btn:active { transform: translateY(1px); }
+.cal-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+.cal-btn.is-primary { border-color: transparent; background: var(--accent-color); color: var(--bg-color); }
+.cal-btn.is-primary:hover { background: var(--accent-hover); }
+
+.cal-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: var(--spacing-md); }
+
+progress { width: 100%; height: 4px; margin: 9px 0; accent-color: var(--accent-color); }
+
+/* ── Hints ──────────────────────────── minutely/settings.css:52-79 ─────── */
+
+.cal-hint { font-size: var(--font-size-sm); line-height: 1.55; color: var(--muted); margin: 7px 0 9px; }
+.cal-hint:last-child { margin-bottom: 0; }
+.cal-hint a { color: var(--accent-color); }
+
+/* Amber rather than grey on purpose. Whatever is on screen is a materially
+   different thing to hand to a third party than one's own notes, and it should
+   not read as boilerplate. */
+.cal-warn-text {
+  padding: var(--spacing-md) 10px;
+  border-radius: var(--border-radius);
+  border: 1px solid rgba(253, 214, 99, 0.28);
+  background: rgba(253, 214, 99, 0.06);
+  color: var(--warn);
 }
 
-.setting-group label {
-  display: block;
-  margin-bottom: 8px;
-  color: #909296;
-  font-size: 12px;
+/* ── Disclosure ─────────────────────── minutely/settings.css:247-285 ───── */
+
+/* The API key sits behind this. Chrome's built-in model needs no key at all,
+   so an always-visible key field was the first thing a new user saw and read
+   as a price. */
+.cal-details { margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 9px; }
+
+.cal-details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  list-style: none;
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--muted);
+  padding: 3px 0;
+  transition: color 0.16s ease;
 }
+
+.cal-details > summary::-webkit-details-marker { display: none; }
+.cal-details > summary:hover { color: var(--text-color); }
+
+.cal-chev { flex: none; font-size: 15px; line-height: 1; color: var(--muted); transition: transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1); }
+.cal-details[open] > summary .cal-chev { transform: rotate(90deg); }
+.cal-details[open] .cal-details-body { animation: cal-reveal 0.2s ease both; }
+
+@keyframes cal-reveal {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+[hidden] { display: none !important; }
